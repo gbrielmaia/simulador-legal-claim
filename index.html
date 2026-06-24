@@ -173,7 +173,7 @@
       </div>
       <div class="panel hide" id="panelSensEo">
         <h2 class="sec">Sensibilidade — TIR × earn-out</h2>
-        <table class="sens" id="tblSensEo"><thead><tr><th>Fator %EO</th><th>TIR</th></tr></thead><tbody></tbody></table>
+        <table class="sens" id="tblSensEo"><thead><tr><th>% Earn-out</th><th>TIR</th></tr></thead><tbody></tbody></table>
       </div>
     </div>
   </div>
@@ -318,7 +318,7 @@ function price(inp, snap, ferSet){
   const hurBoP = [], hurEoP = [];
   const r42 = []; const dates42 = [];
   let accJur = 0; // soma de juros acruados do precatório (p/ Juros Pagos no bullet)
-  let earnoutPago = 0, recebidoBrutoBullet = 0; // p/ composição do recebimento
+  let earnoutPago = 0, recebidoBrutoBullet = 0, earnoutPctBase = 0; // p/ composição e sensibilidade
   for (let m = 1; m <= NMONTHS; m++){
     // precatório
     precBoP[m] = (m === 1) ? face : precEoP[m - 1];
@@ -351,7 +351,7 @@ function price(inp, snap, ferSet){
     // fluxo (r42)
     const recebido = inp.temAcordo ? precPMT[m] * inp.acordoFator : precPMT[m];
     earnoutPago += r63 + r64;
-    if (isBullet) recebidoBrutoBullet = recebido;
+    if (isBullet) { recebidoBrutoBullet = recebido; earnoutPctBase = pctJanela(m); }
     r42[m] = recebido - r63 - r64 - desemb(m) * pricef;
     dates42[m] = date[m];
   }
@@ -369,7 +369,7 @@ function price(inp, snap, ferSet){
   return { tir, preco: precoPago, desagio, moic, prazoMedio,
            dataPagamento: bullet.toISOString().slice(0, 10),
            jurosPagos: accJur, faceCorrigido: face + accJur,
-           earnoutPago, recebidoBrutoBullet,
+           earnoutPago, recebidoBrutoBullet, earnoutPctBase,
            recebidoLiquidoBullet: recebidoBrutoBullet - earnoutPago,
            ipcaImplicito: ipcaN ? ipcaSum / ipcaN : 0,
            fluxo: cfs.map((c, i) => ({ date: dts[i].toISOString().slice(0, 10), cf: c })) };
@@ -516,14 +516,16 @@ function recalc(){
     tr.innerHTML=`<td>${p}</td><td>${o2.dataPagamento}</td><td>${f2(o2.tir)}</td>`;
     tb.appendChild(tr);
   });
-  // TIR × earn-out (fator aplicado aos % das janelas) — só quando há earn-out
+  // TIR × earn-out (% do earn-out ±10/±20pp em torno do base) — só quando há earn-out
   if(inp.temEarnout){
+    const basePct=o.earnoutPctBase;                       // % ativo no pagamento (base)
     tb=$('tblSensEo').querySelector('tbody'); tb.innerHTML='';
-    [0,0.5,1.0,1.5,2.0].forEach(fac=>{
-      const jan=(inp.eoJanelas||[]).map(w=>({de:w.de,ate:w.ate,pct:w.pct*fac}));
+    [-0.20,-0.10,0,0.10,0.20].forEach(d=>{
+      const pct=Math.max(0,Math.min(1,basePct+d));
+      const jan=(inp.eoJanelas||[]).map(w=>({de:w.de,ate:w.ate,pct:Math.max(0,Math.min(1,w.pct+d))}));
       const o2=PrecatEngine.price(Object.assign({},inp,{eoJanelas:jan}),SNAP,FER);
-      const tr=document.createElement('tr'); if(Math.abs(fac-1)<1e-9) tr.className='basecase';
-      tr.innerHTML=`<td>${fac.toFixed(1)}×</td><td>${f2(o2.tir)}</td>`;
+      const tr=document.createElement('tr'); if(Math.abs(d)<1e-9) tr.className='basecase';
+      tr.innerHTML=`<td>${(pct*100).toFixed(0)}%</td><td>${f2(o2.tir)}</td>`;
       tb.appendChild(tr);
     });
   }
