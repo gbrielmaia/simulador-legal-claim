@@ -87,7 +87,7 @@
         <div class="field"><label>É precatório?</label>
           <label class="sw"><input type="checkbox" id="ehPrec" onchange="sync()"><span class="sl"></span></label></div>
         <div class="field"><label>Há earn-out?</label>
-          <label class="sw"><input type="checkbox" id="temEo" checked onchange="sync()"><span class="sl"></span></label></div>
+          <label class="sw"><input type="checkbox" id="temEo" onchange="sync()"><span class="sl"></span></label></div>
         <div class="field"><label>Há acordo?</label>
           <label class="sw"><input type="checkbox" id="temAc" onchange="sync()"><span class="sl"></span></label></div>
         <div class="field"><label>Pagamento</label>
@@ -96,19 +96,19 @@
 
       <div class="panel">
         <h2 class="sec">Precatório</h2>
-        <div class="field"><label>Valor de face<span class="help" title="Valor nominal do crédito na data-base de hoje, antes de qualquer correção.">i</span></label><span><input type="text" inputmode="decimal" id="face" value="40.000.000,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field"><label>Valor de face<span class="help" title="Valor nominal do crédito na data-base de hoje, antes de qualquer correção.">i</span></label><span><input type="text" inputmode="decimal" id="face" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
 
         <div class="subhdr" id="hdrPreFase">Fase pré-precatório</div>
-        <div class="field" id="rowVira"><label>Vira precatório em<span class="help" title="Meses até o crédito ser efetivamente inscrito como precatório. Até lá corrige pela 'Correção pré-precatório'.">i</span></label><span><input type="number" id="viraMeses" value="72" oninput="recalc()"><span class="suffix">meses</span></span></div>
+        <div class="field" id="rowVira"><label>Vira precatório em<span class="help" title="Meses até o crédito ser efetivamente inscrito como precatório. Até lá corrige pela 'Correção pré-precatório'.">i</span></label><span><input type="number" id="viraMeses" value="0" oninput="recalc()"><span class="suffix">meses</span></span></div>
         <div class="field" id="rowPre"><label>Correção pré-precatório<span class="help" title="Índice + taxa que corrigem o crédito ANTES de virar precatório. Pré = taxa fixa que você digita; CDI = curva nominal + spread; IPCA = inflação (campo IPCA abaixo) + spread.">i</span></label><span>
           <select id="corrPreIdx" onchange="recalc()"><option selected>Pré</option><option>IPCA</option><option>CDI</option></select>
-          <span class="suffix" id="connPre">+</span><input type="number" id="corrPre" value="8" step="0.1" oninput="recalc()"><span class="suffix">% a.a.</span></span></div>
+          <span class="suffix" id="connPre">+</span><input type="number" id="corrPre" value="0" step="0.1" oninput="recalc()"><span class="suffix">% a.a.</span></span></div>
 
         <div class="subhdr">Fase precatório</div>
-        <div class="field"><label>Prazo até pagamento<span class="help" title="Meses entre virar precatório e o pagamento (bullet).">i</span></label><span><input type="number" id="prazo" value="24" oninput="recalc()"><span class="suffix">meses</span></span></div>
+        <div class="field"><label>Prazo até pagamento<span class="help" title="Meses entre virar precatório e o pagamento (bullet).">i</span></label><span><input type="number" id="prazo" value="0" oninput="recalc()"><span class="suffix">meses</span></span></div>
         <div class="field"><label>Correção precatório<span class="help" title="Índice + spread que corrigem o precatório DEPOIS de inscrito. Pré = taxa fixa; CDI = curva nominal + spread; IPCA = inflação (campo IPCA abaixo) + spread.">i</span></label><span>
-          <select id="corrIdx" onchange="recalc()"><option>Pré</option><option selected>IPCA</option><option>CDI</option></select>
-          <span class="suffix" id="connCorr">+</span><input type="number" id="corrSpread" value="2" step="0.1" oninput="recalc()"><span class="suffix">% a.a.</span></span></div>
+          <select id="corrIdx" onchange="recalc()"><option selected>Pré</option><option>IPCA</option><option>CDI</option></select>
+          <span class="suffix" id="connCorr">+</span><input type="number" id="corrSpread" value="0" step="0.1" oninput="recalc()"><span class="suffix">% a.a.</span></span></div>
         <div class="field" id="rowIpca"><label>IPCA<span class="help" title="Premissa ÚNICA de inflação. ETTJ = IPCA médio implícito (breakeven) da curva. Manual = você sobrepõe. Alimenta tudo que estiver indexado a IPCA (pré-precatório, precatório e earn-out).">i</span></label><span>
           <span class="seg" style="margin-right:6px"><button id="ipcaCurva" class="on" onclick="setIpca('curva')">ETTJ</button><button id="ipcaMan" onclick="setIpca('manual')">Manual</button></span>
           <input type="number" id="ipcaVal" value="0" step="0.1" oninput="recalc()" disabled><span class="suffix">% a.a.</span></span></div>
@@ -116,8 +116,8 @@
 
       <div class="panel">
         <h2 class="sec">Aquisição</h2>
-        <div class="field" id="rowPreco"><label>Preço (à vista)</label><span><input type="text" inputmode="decimal" id="preco" value="5.000.000,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
-        <div class="field"><label>TIR-alvo<span class="help" title="Resolve o preço (à vista) ou escala as levas (parcelado) para que a TIR fique igual à meta. Útil para definir o quanto pagar.">i</span></label><span class="gsbox"><input type="number" id="tirAlvo" value="30" step="0.5"><span class="suffix">%</span><button class="btn noprint" onclick="goalSeek()">resolver preço</button></span></div>
+        <div class="field" id="rowPreco"><label>Preço (à vista)</label><span><input type="text" inputmode="decimal" id="preco" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field"><label>TIR-alvo<span class="help" title="Resolve o preço (à vista) ou escala as levas (parcelado) para que a TIR fique igual à meta. Útil para definir o quanto pagar.">i</span></label><span class="gsbox"><input type="number" id="tirAlvo" value="0" step="0.5"><span class="suffix">%</span><button class="btn noprint" onclick="goalSeek()">resolver preço</button></span></div>
         <div id="boxLevas" class="hide">
           <table class="levas" id="tblLevas"><thead><tr><th style="text-align:left;font-size:9px;color:var(--ink-mute)">Data</th><th style="font-size:9px;color:var(--ink-mute)">Valor (R$)</th><th></th></tr></thead><tbody></tbody></table>
           <button class="btn" onclick="addLeva()">+ leva</button>
@@ -128,13 +128,13 @@
         <h2 class="sec adv-h" id="advH" onclick="toggleAdv()">Avançado</h2>
         <div id="advBody" class="hide">
           <div id="boxAcordo">
-            <div class="field"><label>Acordo — fator de deságio<span class="help" title="Percentual dos fluxos que você recebe num acordo direto (haircut). Ex.: 60% = recebe 60% do que o precatório pagaria.">i</span></label><span><input type="number" id="acFator" value="60" step="1" oninput="recalc()"><span class="suffix">%</span></span></div>
-            <div class="field"><label>Acordo — prazo<span class="help" title="Meses até o acordo direto liquidar. SUBSTITUI o 'Prazo até pagamento' da fila normal quando 'Há acordo?' está ligado.">i</span></label><span><input type="number" id="acPrazo" value="6" oninput="recalc()"><span class="suffix">meses</span></span></div>
+            <div class="field"><label>Acordo — fator de deságio<span class="help" title="Percentual dos fluxos que você recebe num acordo direto (haircut). Ex.: 60% = recebe 60% do que o precatório pagaria.">i</span></label><span><input type="number" id="acFator" value="0" step="1" oninput="recalc()"><span class="suffix">%</span></span></div>
+            <div class="field"><label>Acordo — prazo<span class="help" title="Meses até o acordo direto liquidar. SUBSTITUI o 'Prazo até pagamento' da fila normal quando 'Há acordo?' está ligado.">i</span></label><span><input type="number" id="acPrazo" value="0" oninput="recalc()"><span class="suffix">meses</span></span></div>
           </div>
           <div id="boxEo">
             <div class="field"><label>Earn-out — piso<span class="help" title="Índice + spread da subordinada (hurdle). Pré = taxa fixa; CDI = curva nominal + spread; IPCA = inflação (campo IPCA acima) + spread. O earn-out só paga o excedente acima desse piso.">i</span></label><span>
-              <select id="eoIdx" onchange="recalc()"><option>Pré</option><option>IPCA</option><option selected>CDI</option></select>
-              <span class="suffix" id="connEo">+</span><input type="number" id="eoSpread" value="8" step="0.5" oninput="recalc()"><span class="suffix">% a.a.</span></span></div>
+              <select id="eoIdx" onchange="recalc()"><option selected>Pré</option><option>IPCA</option><option>CDI</option></select>
+              <span class="suffix" id="connEo">+</span><input type="number" id="eoSpread" value="0" step="0.5" oninput="recalc()"><span class="suffix">% a.a.</span></span></div>
             <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mute);margin:8px 0 2px;">Janelas (de–até meses → %)</div>
             <table class="levas" id="tblJan"><tbody></tbody></table>
           </div>
@@ -420,7 +420,7 @@ function setIpca(m){ IPCAMODE=m;
 }
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800); }
 
-const JAN_DEF = [[0,12,70],[13,24,70],[25,31,70],[32,10000,70]];
+const JAN_DEF = [[0,12,0],[13,24,0],[25,31,0],[32,10000,0]];
 function renderJanelas(){
   const tb=$('tblJan').querySelector('tbody'); tb.innerHTML='';
   JAN_DEF.forEach((w,i)=>{ const tr=document.createElement('tr');
@@ -429,7 +429,7 @@ function renderJanelas(){
       <td><input type=number value=${w[2]} oninput="JAN_DEF[${i}][2]=+this.value;recalc()"><span class=suffix>%</span></td>`;
     tb.appendChild(tr); });
 }
-let LEVAS = [[SNAP.data_base,5000000]];
+let LEVAS = [[SNAP.data_base,0]];
 function renderLevas(){
   const tb=$('tblLevas').querySelector('tbody'); tb.innerHTML='';
   LEVAS.forEach((l,i)=>{ const tr=document.createElement('tr');
@@ -469,6 +469,19 @@ function readInputs(){
 }
 function recalc(){
   const inp=readInputs();
+  // conectores "+" (somem quando índice = Pré) — sempre atualizam
+  $('connPre').classList.toggle('hide', inp.corrPreIdx==='Pré');
+  $('connCorr').classList.toggle('hide', inp.corrIdx==='Pré');
+  $('connEo').classList.toggle('hide', inp.eoIdx==='Pré');
+  // MODO TEMPLATE: enquanto faltar face, preço ou prazo, mostra tudo em branco (evita cálculo com campo esquecido)
+  const somaLevas = inp.levas.reduce((s,l)=>s+(l.valor||0),0);
+  const efPrazo = inp.temAcordo ? inp.acordoPrazo : inp.prazoMeses;
+  if(!(inp.face>0) || !(somaLevas>0) || !(efPrazo>0)){
+    ['rTir','rPreco','rDes','rMoic','rPrazo','rData','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
+    if(IPCAMODE==='curva') $('ipcaVal').value='0';
+    ['tblSensPreco','tblSensPrazo','tblSensEo'].forEach(id=>$(id).querySelector('tbody').innerHTML='');
+    return;
+  }
   const o=PrecatEngine.price(inp, SNAP, FER);
   $('rTir').textContent=(o.tir*100).toFixed(2)+'%';
   $('rPreco').textContent=fmtBRL(o.preco);
@@ -478,10 +491,6 @@ function recalc(){
   $('rData').textContent=o.dataPagamento;
   // IPCA implícito da ETTJ: em modo ETTJ, mostra no campo (read-only)
   if(IPCAMODE==='curva') $('ipcaVal').value=(o.ipcaImplicito*100).toFixed(2);
-  // esconde o "+" quando o índice é "Pré" (taxa fixa, sem índice a somar)
-  $('connPre').classList.toggle('hide', inp.corrPreIdx==='Pré');
-  $('connCorr').classList.toggle('hide', inp.corrIdx==='Pré');
-  $('connEo').classList.toggle('hide', inp.eoIdx==='Pré');
   // composição do recebimento
   $('cFace').textContent=fmtBRL(inp.face);
   $('cJuros').textContent=fmtBRL(o.jurosPagos);
@@ -545,6 +554,8 @@ function solvePricef(inp, target){
 function goalSeek(){
   const target=num('tirAlvo')/100;
   const inp=readInputs();
+  const efPrazo = inp.temAcordo ? inp.acordoPrazo : inp.prazoMeses;
+  if(!(inp.face>0) || !(efPrazo>0) || !(target>0)){ toast('Preencha face, prazo e TIR-alvo (>0) antes de resolver o preço'); return; }
   const f=solvePricef(inp, target);
   if(MODO==='avista'){ $('preco').value=fmtBRL(money('preco')*f); }
   else { LEVAS=LEVAS.map(l=>[l[0], l[1]*f]); renderLevas(); }
