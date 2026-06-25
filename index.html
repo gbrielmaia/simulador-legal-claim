@@ -434,6 +434,14 @@ function maskMoney(el){ let s=el.value.replace(/[^\d,]/g,''); const hasC=s.index
   if(hasC) dec=(dec+'00').slice(0,2);
   intp=intp.replace(/\B(?=(\d{3})+(?!\d))/g,'.'); el.value=(intp||'0')+(hasC?(','+dec):''); }
 
+// UX: ao focar um campo numérico que está no zero default, ele esvazia (não precisa apagar à mão);
+// se sair vazio/zero, restaura "0"/"0,00" formatado. Campos com valor real digitado não são tocados.
+const _numIn = (el)=> el.tagName==='INPUT' && (el.type==='number' || el.getAttribute('inputmode')==='decimal');
+const _zero  = (el)=>{ const v=el.value.trim(); return v==='' || /^0([.,]0*)?$/.test(v); };
+document.addEventListener('focusin',  (e)=>{ if(_numIn(e.target) && _zero(e.target)) e.target.value=''; });
+document.addEventListener('focusout', (e)=>{ const el=e.target;
+  if(_numIn(el) && _zero(el)) el.value = (el.getAttribute('inputmode')==='decimal') ? '0,00' : '0'; });
+
 let IPCAMODE = 'curva';   // 'curva' = IPCA implícito da ETTJ ; 'manual' = override
 function setIpca(m){ IPCAMODE=m;
   $('ipcaCurva').classList.toggle('on',m==='curva'); $('ipcaMan').classList.toggle('on',m==='manual');
