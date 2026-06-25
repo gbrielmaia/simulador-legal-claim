@@ -475,12 +475,16 @@ function readInputs(){
     ipcaOverride: (IPCAMODE==='manual') ? num('ipcaVal')/100 : null };
 }
 // IPCA implícito da ETTJ depende SÓ da curva + horizonte (vira/bullet), não de preço/face.
-// Mostra assim que houver prazo definido; em branco se ainda não há horizonte (nunca 0% enganoso).
+// SEMPRE mostra um número em modo ETTJ: usa a janela do negócio quando há prazo; senão um
+// breakeven de referência de 5 anos a partir da data-base (a premissa da curva nunca fica vazia).
 function updateIpcaImpl(inp){
   if(IPCAMODE!=='curva') return;                         // modo manual: campo é input do usuário
   const efPrazo = inp.temAcordo ? inp.acordoPrazo : inp.prazoMeses;
-  if(!(efPrazo>0)){ $('ipcaVal').value=''; return; }
-  const probe = PrecatEngine.price({...inp, face:1, modo:'avista', levas:[{date:SNAP.data_base, valor:1}]}, SNAP, FER);
+  const probeInp = (efPrazo>0)
+    ? {...inp, face:1, modo:'avista', levas:[{date:SNAP.data_base, valor:1}]}
+    : {...inp, face:1, modo:'avista', levas:[{date:SNAP.data_base, valor:1}],
+       ehPrecatorio:true, temAcordo:false, viraMeses:0, prazoMeses:60};  // referência 5 anos
+  const probe = PrecatEngine.price(probeInp, SNAP, FER);
   $('ipcaVal').value=(probe.ipcaImplicito*100).toFixed(2);
 }
 function recalc(){
