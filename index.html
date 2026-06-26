@@ -144,7 +144,7 @@
       <div class="panel">
         <h2 class="sec">Precatório</h2>
         <div class="field"><label>Valor de face<span class="help" title="Valor do precatório HOJE (na data-base) — já inclui a causa + os juros/correção acruados até hoje. É o que é amortizado no pagamento.">i</span></label><span><input type="text" inputmode="decimal" id="face" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
-        <div class="field"><label>Valor da causa<span class="help" title="Principal (valor original da causa), sem os juros já acruados. O juros simples forward (IPCA+spread) incide sobre ESTE valor, não sobre o face (que já tem juros). Deixe 0 para usar o valor de face (precatório recém-inscrito).">i</span></label><span><input type="text" inputmode="decimal" id="valorCausa" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field"><label>Valor requisitado<span class="help" title="Principal (valor requisitado), sem os juros já acruados. O juros simples forward (IPCA+spread) incide sobre ESTE valor, não sobre o face (que já tem juros). Deixe 0 para usar o valor de face (precatório recém-inscrito).">i</span></label><span><input type="text" inputmode="decimal" id="valorCausa" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
         <div class="field"><label>Valor a pagar<span class="help" title="Preço total da aquisição. À vista = pago de uma vez na data de início; parcelado = dividido em N parcelas iguais mensais a partir da data de início.">i</span></label><span><input type="text" inputmode="decimal" id="valorPagar" value="0,00" oninput="regenParcelas();recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
         <div class="field"><label>Data de início<span class="help" title="Data em que a operação começa (correção e desembolso). Default = data-base da ETTJ. O 1º mês é pro-rata a partir dela. A curva é sempre lida pela data-base da ETTJ.">i</span></label><span><input type="date" id="dataInicio" oninput="regenParcelas();recalc()"></span></div>
 
@@ -820,7 +820,7 @@ function exportarXlsx(){
     ['Nome do crédito (DIU)',nome],['Data do cálculo',dataCalc],['Curva ETTJ (data-base)',d.curva.dataBase],[],
     ['Tipo',inp.ehPrecatorio?'Precatório':'Direito creditório'],['Modo de pagamento',inp.modo==='parcelado'?'Parcelado':'À vista'],
     ['Earn-out',inp.temEarnout?'Sim':'Não'],['Acordo',inp.temAcordo?'Sim':'Não'],[],
-    ['Valor de face (R$)',inp.face],['Valor da causa (R$)',c.causa],['Valor a pagar (R$)',somaLevas],
+    ['Valor de face (R$)',inp.face],['Valor requisitado (R$)',c.causa],['Valor a pagar (R$)',somaLevas],
     ['Data de início',inp.dataInicio||d.curva.dataBase],['Vira precatório em (meses)',inp.viraMeses],
     ['Correção pré (% a.a., decimal)',inp.corrPre],['Prazo até pagamento (meses)',inp.prazoMeses],
     ['Correção precatório — índice',inp.corrIdx],['Correção precatório — spread (decimal)',inp.corrSpread],
