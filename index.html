@@ -31,10 +31,14 @@
   .field{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dotted var(--rule);}
   .field:last-child{border-bottom:none;} .field label{font-size:12px;color:var(--ink-soft);}
   input,select{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--gold);font-weight:500;background:#fff;border:1px solid var(--rule-strong);padding:5px 7px;}
-  input[type=number]{width:120px;text-align:right;} input[type=date]{width:130px;color:var(--ok);}
+  input[type=number],input[inputmode=decimal]{width:120px;text-align:right;} input[type=date]{width:120px;color:var(--ok);}
   input:focus,select:focus{outline:2px solid var(--gold);outline-offset:-1px;}
   .suffix{font-size:11px;color:var(--ink-mute);font-family:'IBM Plex Mono',monospace;margin-left:4px;}
   #connPre,#connCorr,#connEo{margin-right:6px;}  /* respiro entre o "+" e a caixa do valor */
+  /* alinha as caixas de input numa coluna fixa: a borda direita do box fica alinhada e o
+     descritivo (sufixo) ocupa uma faixa fixa à direita, variando o texto sem mover a caixa */
+  .panel .field > span > .suffix:last-child{display:inline-block;width:52px;text-align:left;}
+  .panel .field > span > input:last-child{margin-right:56px;}  /* campos sem sufixo (data, nº parcelas) alinham igual */
   /* switch */
   .sw{position:relative;width:44px;height:22px;display:inline-block;}
   .sw input{opacity:0;width:0;height:0;}
