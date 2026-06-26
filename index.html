@@ -159,9 +159,7 @@
       <div class="panel">
         <h2 class="sec">Resultado</h2>
         <div class="res"><span class="k">TIR (a.a.)<span class="help" title="Taxa interna de retorno anual do fluxo (XIRR), base 365. Reconcilia ≈ (1+PRÉ)×(1+(IPCA+2%)·prazo)^(1/prazo)−1.">i</span></span><span class="v big" id="rTir">—</span></div>
-        <div class="res"><span class="k">IPCA + 2% (a.a., juros simples)<span class="help" title="Correção contratual do título: o administrador corrige a CAUSA por IPCA + spread em juros simples. Soma do IPCA da ETTJ/manual com o spread.">i</span></span><span class="v" id="rCorr">—</span></div>
-        <div class="res sub"><span class="k">↳ IPCA (ETTJ/manual)<span class="help" title="Componente de inflação: a IPCA média da ETTJ (ou manual) aplicada na correção. Mesmo número do campo IPCA das premissas.">i</span></span><span class="v" id="rIpcaDec">—</span></div>
-        <div class="res sub"><span class="k">↳ + spread<span class="help" title="O spread contratual da correção do precatório (default 2%).">i</span></span><span class="v" id="rSpread">—</span></div>
+        <div class="res"><span class="k">IPCA + 2% (a.a., juros simples)<span class="help" title="Correção contratual do título: o administrador corrige a CAUSA por IPCA + spread em juros simples. IPCA = a média da ETTJ/manual (mesmo número do campo IPCA das premissas) somada ao spread (default 2%).">i</span></span><span class="v" id="rCorr">—</span></div>
         <div class="res"><span class="k">PRÉ (a.a., juros compostos)<span class="help" title="Carrego do deságio: o preço de compra puxa até a face REALIZÁVEL (face × fator de acordo) ao longo do prazo. PRÉ = (face realizável/preço)^(1/prazo) − 1. Sem deságio é 0.">i</span></span><span class="v" id="rPre">—</span></div>
         <div class="res"><span class="k">Preço total</span><span class="v" id="rPreco">—</span></div>
         <div class="res"><span class="k">Deságio<span class="help" title="Sobre o valor de face NOMINAL de hoje (1 − preço/face). Não é deságio sobre o montante a receber no pagamento.">i</span></span><span class="v" id="rDes">—</span></div>
@@ -552,7 +550,7 @@ function recalc(){
   const somaLevas = inp.levas.reduce((s,l)=>s+(l.valor||0),0);
   const efPrazo = inp.temAcordo ? inp.acordoPrazo : inp.prazoMeses;
   if(!(inp.face>0) || !(somaLevas>0) || !(efPrazo>0)){
-    ['rTir','rCorr','rIpcaDec','rSpread','rPre','rPreco','rDes','rMoic','rPrazo','rData','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
+    ['rTir','rCorr','rPre','rPreco','rDes','rMoic','rPrazo','rData','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
     updateIpcaImpl(inp);   // IPCA implícito ainda aparece (depende só da curva+prazo), não força 0
     $('tblSensX').querySelector('thead').innerHTML=''; ['tblSensX','tblSensEo'].forEach(id=>$(id).querySelector('tbody').innerHTML='');
     return;
@@ -560,8 +558,6 @@ function recalc(){
   const o=PrecatEngine.price(inp, SNAP, FER);
   $('rTir').textContent=(o.tir*100).toFixed(2)+'%';
   $('rCorr').textContent=(o.correcaoSimples*100).toFixed(2)+'%';
-  $('rIpcaDec').textContent=(o.ipcaSimples*100).toFixed(2)+'%';
-  $('rSpread').textContent=(o.spreadSimples*100).toFixed(2)+'%';
   $('rPre').textContent=(o.preComposto*100).toFixed(1)+'%';
   $('rPreco').textContent=fmtBRL(o.preco);
   $('rDes').textContent=(o.desagio*100).toFixed(1)+'%';
