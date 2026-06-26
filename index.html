@@ -164,7 +164,6 @@
         <div class="res"><span class="k">Preço total</span><span class="v" id="rPreco">—</span></div>
         <div class="res"><span class="k">Deságio<span class="help" title="Sobre o valor de face NOMINAL de hoje (1 − preço/face). Não é deságio sobre o montante a receber no pagamento.">i</span></span><span class="v" id="rDes">—</span></div>
         <div class="res"><span class="k">MOIC<span class="help" title="Múltiplo sobre o capital: total recebido ÷ preço pago.">i</span></span><span class="v" id="rMoic">—</span></div>
-        <div class="res"><span class="k">Prazo médio (m)<span class="help" title="Prazo médio dos recebimentos, ponderado pelos fluxos positivos.">i</span></span><span class="v" id="rPrazo">—</span></div>
         <div class="res"><span class="k">Pagamento em</span><span class="v" id="rData">—</span></div>
       </div>
       <div class="panel">
@@ -550,7 +549,7 @@ function recalc(){
   const somaLevas = inp.levas.reduce((s,l)=>s+(l.valor||0),0);
   const efPrazo = inp.temAcordo ? inp.acordoPrazo : inp.prazoMeses;
   if(!(inp.face>0) || !(somaLevas>0) || !(efPrazo>0)){
-    ['rTir','rCorr','rPre','rPreco','rDes','rMoic','rPrazo','rData','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
+    ['rTir','rCorr','rPre','rPreco','rDes','rMoic','rData','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
     updateIpcaImpl(inp);   // IPCA implícito ainda aparece (depende só da curva+prazo), não força 0
     $('tblSensX').querySelector('thead').innerHTML=''; ['tblSensX','tblSensEo'].forEach(id=>$(id).querySelector('tbody').innerHTML='');
     return;
@@ -562,7 +561,6 @@ function recalc(){
   $('rPreco').textContent=fmtBRL(o.preco);
   $('rDes').textContent=(o.desagio*100).toFixed(1)+'%';
   $('rMoic').textContent=o.moic.toFixed(2)+'x';
-  $('rPrazo').textContent=o.prazoMedio.toFixed(0);
   $('rData').textContent=o.dataPagamento;
   // IPCA implícito da ETTJ: em modo ETTJ, mostra no campo (read-only)
   if(IPCAMODE==='curva') $('ipcaVal').value=(o.ipcaImplicito*100).toFixed(2);
