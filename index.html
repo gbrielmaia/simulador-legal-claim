@@ -143,8 +143,8 @@
 
       <div class="panel">
         <h2 class="sec">Precatório</h2>
-        <div class="field"><label>Valor de face<span class="help" title="Valor do precatório HOJE (na data-base) — já inclui a causa + os juros/correção acruados até hoje. É o que é amortizado no pagamento.">i</span></label><span><input type="text" inputmode="decimal" id="face" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
-        <div class="field"><label>Valor requisitado<span class="help" title="Principal (valor requisitado), sem os juros já acruados. O juros simples forward (IPCA+spread) incide sobre ESTE valor, não sobre o face (que já tem juros). Deixe 0 para usar o valor de face (precatório recém-inscrito).">i</span></label><span><input type="text" inputmode="decimal" id="valorCausa" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field"><label>Valor atualizado<span class="help" title="Valor do precatório HOJE (na data-base) — já inclui o valor requisitado + os juros/correção acruados até hoje. É o que é amortizado no pagamento.">i</span></label><span><input type="text" inputmode="decimal" id="face" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field"><label>Valor requisitado<span class="help" title="Principal (valor requisitado), sem os juros já acruados. O juros simples forward (IPCA+spread) incide sobre ESTE valor, não sobre o valor atualizado (que já tem juros). Deixe 0 para usar o valor atualizado (precatório recém-inscrito).">i</span></label><span><input type="text" inputmode="decimal" id="valorCausa" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
         <div class="field"><label>Valor a pagar<span class="help" title="Preço total da aquisição. À vista = pago de uma vez na data de início; parcelado = dividido em N parcelas iguais mensais a partir da data de início.">i</span></label><span><input type="text" inputmode="decimal" id="valorPagar" value="0,00" oninput="regenParcelas();recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
         <div class="field"><label>Data de início<span class="help" title="Data em que a operação começa (correção e desembolso). Default = data-base da ETTJ. O 1º mês é pro-rata a partir dela. A curva é sempre lida pela data-base da ETTJ.">i</span></label><span><input type="date" id="dataInicio" oninput="regenParcelas();recalc()"></span></div>
 
@@ -200,15 +200,15 @@
         <div class="res"><span class="k">IPCA + 2% (a.a., juros simples)<span class="help" title="Correção contratual do título: o administrador corrige a CAUSA por IPCA + spread em juros simples. IPCA = a média da ETTJ/manual (mesmo número do campo IPCA das premissas) somada ao spread (default 2%).">i</span></span><span class="v" id="rCorr">—</span></div>
         <div class="res"><span class="k">PRÉ (a.a., juros compostos)<span class="help" title="Carrego do deságio: o preço de compra puxa até a face REALIZÁVEL (face × fator de acordo) ao longo do prazo. PRÉ = (face realizável/preço)^(1/prazo) − 1. Sem deságio é 0.">i</span></span><span class="v" id="rPre">—</span></div>
         <div class="res"><span class="k">Preço total</span><span class="v" id="rPreco">—</span></div>
-        <div class="res"><span class="k">Deságio<span class="help" title="Sobre o valor de face NOMINAL de hoje (1 − preço/face). Não é deságio sobre o montante a receber no pagamento.">i</span></span><span class="v" id="rDes">—</span></div>
+        <div class="res"><span class="k">Fator deságio<span class="help" title="Quanto você paga como fração do valor atualizado nominal de hoje (preço ÷ valor atualizado = 1 − deságio).">i</span></span><span class="v" id="rDes">—</span></div>
         <div class="res"><span class="k">MOIC<span class="help" title="Múltiplo sobre o capital: total recebido ÷ preço pago.">i</span></span><span class="v" id="rMoic">—</span></div>
         <div class="res"><span class="k">Pagamento em</span><span class="v" id="rData">—</span></div>
       </div>
       <div class="panel">
         <h2 class="sec">Composição do recebimento</h2>
-        <div class="res sub"><span class="k">Valor de face (nominal hoje)</span><span class="v" id="cFace">—</span></div>
+        <div class="res sub"><span class="k">Valor atualizado (nominal hoje)</span><span class="v" id="cFace">—</span></div>
         <div class="res sub"><span class="k">(+) Correção até o pagamento</span><span class="v" id="cJuros">—</span></div>
-        <div class="res sub"><span class="k">(=) Face corrigido no pagamento</span><span class="v" id="cFaceC">—</span></div>
+        <div class="res sub"><span class="k">(=) Valor atualizado corrigido no pagamento</span><span class="v" id="cFaceC">—</span></div>
         <div class="res sub hide" id="cRowAcordo"><span class="k">(×) Fator de acordo</span><span class="v" id="cFator">—</span></div>
         <div class="res sub hide" id="cRowEo"><span class="k">(−) Earn-out pago</span><span class="v" id="cEo">—</span></div>
         <div class="res tot"><span class="k">Recebido líquido</span><span class="v" id="cRecLiq">—</span></div>
@@ -648,7 +648,7 @@ function recalc(){
   $('rCorr').textContent=(o.correcaoSimples*100).toFixed(2)+'%';
   $('rPre').textContent=(o.preComposto*100).toFixed(1)+'%';
   $('rPreco').textContent=fmtBRL(o.preco);
-  $('rDes').textContent=(o.desagio*100).toFixed(1)+'%';
+  $('rDes').textContent=((1-o.desagio)*100).toFixed(1)+'%';
   $('rMoic').textContent=o.moic.toFixed(2)+'x';
   $('rData').textContent=o.dataPagamento;
   // IPCA implícito da ETTJ: em modo ETTJ, mostra no campo (read-only)
@@ -820,7 +820,7 @@ function exportarXlsx(){
     ['Nome do crédito (DIU)',nome],['Data do cálculo',dataCalc],['Curva ETTJ (data-base)',d.curva.dataBase],[],
     ['Tipo',inp.ehPrecatorio?'Precatório':'Direito creditório'],['Modo de pagamento',inp.modo==='parcelado'?'Parcelado':'À vista'],
     ['Earn-out',inp.temEarnout?'Sim':'Não'],['Acordo',inp.temAcordo?'Sim':'Não'],[],
-    ['Valor de face (R$)',inp.face],['Valor requisitado (R$)',c.causa],['Valor a pagar (R$)',somaLevas],
+    ['Valor atualizado (R$)',inp.face],['Valor requisitado (R$)',c.causa],['Valor a pagar (R$)',somaLevas],
     ['Data de início',inp.dataInicio||d.curva.dataBase],['Vira precatório em (meses)',inp.viraMeses],
     ['Correção pré (% a.a., decimal)',inp.corrPre],['Prazo até pagamento (meses)',inp.prazoMeses],
     ['Correção precatório — índice',inp.corrIdx],['Correção precatório — spread (decimal)',inp.corrSpread],
@@ -836,9 +836,9 @@ function exportarXlsx(){
     ['Mês','Data','Dias corr.','Dias úteis','Índice corr.','Taxa corr. (idx+spread)','Juros acruado','Juros pago','Amortização','Precat. início','Precat. fim','Earn-out pago','Desembolso','Fluxo líquido']];
   d.linhas.forEach(r=>fluxo.push([r.m,r.data,r.dc,r.du,r.txIdx,r.txTot,r.juros,r.jurosPago,r.amort,r.bop,r.eop,r.earnout,r.desembolso,r.fluxo]));
   const comp=[['COMPOSIÇÃO DO RECEBIMENTO & RESULTADO'],[],
-    ['Valor de face (R$)',c.face],['(+) Correção até o pagamento (R$)',c.correcaoTotal],['(=) Face corrigido (R$)',c.faceCorrigido],
+    ['Valor atualizado (R$)',c.face],['(+) Correção até o pagamento (R$)',c.correcaoTotal],['(=) Valor atualizado corrigido (R$)',c.faceCorrigido],
     ['(×) Fator de acordo',c.fatorAcordo],['(−) Earn-out pago (R$)',c.earnoutPago],['(=) Recebido líquido (R$)',c.recebidoLiquido],
-    ['Preço pago (R$)',c.preco],['Deságio',c.desagio],[],
+    ['Preço pago (R$)',c.preco],['Fator deságio',1-c.desagio],[],
     ['TIR (a.a.)',c.tir],['IPCA + 2% (a.a., juros simples)',c.correcaoSimples],['  ↳ IPCA (a.a.)',c.ipcaSimples],
     ['  ↳ spread (a.a.)',c.spreadSimples],['PRÉ (a.a., juros compostos)',c.preComposto],
     ['Prazo (anos, desembolso→pagamento)',c.Teff],['Pagamento em',c.dataPagamento]];
