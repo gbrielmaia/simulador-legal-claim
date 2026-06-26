@@ -158,10 +158,11 @@
     <div>
       <div class="panel">
         <h2 class="sec">Resultado</h2>
-        <div class="res"><span class="k">TIR (a.a.)<span class="help" title="Taxa interna de retorno anual do fluxo (XIRR), base 365.">i</span></span><span class="v big" id="rTir">—</span></div>
-        <div class="res"><span class="k">Retorno simples (a.a.)<span class="help" title="Retorno linear (juros simples): (recebido líquido/preço − 1) ÷ prazo. O precatório corrige a IPCA+2% em juros simples, então esta é a base da decomposição IPCA+PRÉ. Difere da TIR (XIRR/composta) acima, sobretudo em prazos curtos com deságio alto.">i</span></span><span class="v" id="rSimples">—</span></div>
-        <div class="res sub"><span class="k">↳ IPCA (a.a.)<span class="help" title="Componente de inflação da correção (IPCA médio da operação).">i</span></span><span class="v" id="rIpcaDec">—</span></div>
-        <div class="res sub"><span class="k">↳ PRÉ (a.a.)<span class="help" title="Juro real = retorno simples − IPCA. No sem-deságio = o spread (2%); com deságio sobe (mostra quanto o preço de compra está ajudando).">i</span></span><span class="v" id="rPre">—</span></div>
+        <div class="res"><span class="k">TIR (a.a.)<span class="help" title="Taxa interna de retorno anual do fluxo (XIRR), base 365. Reconcilia ≈ (1+PRÉ)×(1+(IPCA+2%)·prazo)^(1/prazo)−1.">i</span></span><span class="v big" id="rTir">—</span></div>
+        <div class="res"><span class="k">IPCA + 2% (a.a., juros simples)<span class="help" title="Correção contratual do título: o administrador corrige a CAUSA por IPCA + spread em juros simples. Soma do IPCA da ETTJ/manual com o spread.">i</span></span><span class="v" id="rCorr">—</span></div>
+        <div class="res sub"><span class="k">↳ IPCA (ETTJ/manual)<span class="help" title="Componente de inflação: a IPCA média da ETTJ (ou manual) aplicada na correção. Mesmo número do campo IPCA das premissas.">i</span></span><span class="v" id="rIpcaDec">—</span></div>
+        <div class="res sub"><span class="k">↳ + spread<span class="help" title="O spread contratual da correção do precatório (default 2%).">i</span></span><span class="v" id="rSpread">—</span></div>
+        <div class="res"><span class="k">PRÉ (a.a., juros compostos)<span class="help" title="Carrego do deságio: o preço de compra puxa até a face REALIZÁVEL (face × fator de acordo) ao longo do prazo. PRÉ = (face realizável/preço)^(1/prazo) − 1. Sem deságio é 0.">i</span></span><span class="v" id="rPre">—</span></div>
         <div class="res"><span class="k">Preço total</span><span class="v" id="rPreco">—</span></div>
         <div class="res"><span class="k">Deságio<span class="help" title="Sobre o valor de face NOMINAL de hoje (1 − preço/face). Não é deságio sobre o montante a receber no pagamento.">i</span></span><span class="v" id="rDes">—</span></div>
         <div class="res"><span class="k">MOIC<span class="help" title="Múltiplo sobre o capital: total recebido ÷ preço pago.">i</span></span><span class="v" id="rMoic">—</span></div>
@@ -304,7 +305,6 @@ function price(inp, snap, ferSet){
   // timeline meses 1..NMONTHS
   const date = [], dc = [], du = [], Pre = [], JR = [], IPCA = [], FRA = [];
   let cumDu = [0];
-  let ipcaSum = 0, ipcaN = 0;   // p/ IPCA médio implícito (breakeven) no período de correção
   for (let m = 1; m <= NMONTHS; m++){
     const me = eomonth(base, m - 1);          // fim do mês m
     const pe = (m === 1) ? base : eomonth(base, m - 2); // 1º mês: pro-rata SEMPRE a partir da data de início (opBase), incl. quando = data-base
@@ -317,8 +317,6 @@ function price(inp, snap, ferSet){
     JR[m] = svensson(t, ipca);
     const bk = (1 + Pre[m]) / (1 + JR[m]) - 1;                       // IPCA breakeven implícito (curva)
     IPCA[m] = (inp.ipcaOverride != null) ? inp.ipcaOverride : bk;    // override manual substitui o implícito
-    // janela de correção pós-precatório: se já é precatório, conta desde o mês 1 (não só após vira_data)
-    if ((inp.ehPrecatorio || serial(me) > sVira) && serial(me) <= sBullet) { ipcaSum += bk; ipcaN++; }
     FRA[m] = (m === 1) ? Pre[m]
       : Math.pow(Math.pow(1 + Pre[m], cumDu[m] / 252) / Math.pow(1 + Pre[m - 1], cumDu[m - 1] / 252), 252 / du[m]) - 1;
   }
@@ -350,6 +348,7 @@ function price(inp, snap, ferSet){
   const r42 = []; const dates42 = [];
   let accJur = 0; // soma de juros acruados do precatório (p/ Juros Pagos no bullet)
   let cIpcaFrac = 0; // fração de IPCA da correção (juros simples) = Σ IPCA[m]*dc/365, p/ decompor PRÉ/IPCA
+  let dcCorrFrac = 0; // fração de tempo (Σ dc/365) da janela de correção, p/ a IPCA MÉDIA aplicada (= IPCA da ETTJ)
   let earnoutPago = 0, recebidoBrutoBullet = 0, earnoutPctBase = 0; // p/ composição e sensibilidade
   for (let m = 1; m <= NMONTHS; m++){
     // precatório
@@ -363,6 +362,7 @@ function price(inp, snap, ferSet){
       else {
         jur = (idxRate(inp.corrIdx, m, "corr") + inp.corrSpread) * dc[m] / 365 * causa;            // pós-precatório (índice + spread) sobre a causa
         cIpcaFrac += idxRate(inp.corrIdx, m, "corr") * dc[m] / 365;  // só a parte de IPCA (sem spread), fração
+        dcCorrFrac += dc[m] / 365;                                   // tempo da janela de correção (p/ média)
       }
     }
     precJur[m] = jur; accJur += jur;
@@ -405,20 +405,30 @@ function price(inp, snap, ferSet){
   // Retorno simples a.a. = (recebido líquido/preço − 1)/T ; IPCA = correção média de IPCA/T ; PRÉ = simples − IPCA
   // No sem-deságio (precatório) PRÉ = exatamente o spread; com deságio o PRÉ sobe (ganho da compra barata).
   const recLiq = recebidoBrutoBullet - earnoutPago;
-  const Tanos = (serial(bullet) - serial(base)) / 365;            // prazo da operação em anos (início -> pagamento)
+  // Decomposição no modelo do administrador do fundo:
+  //  • "IPCA + 2%" = correção contratual do título em JUROS SIMPLES sobre a causa:
+  //      IPCA = média da ETTJ/manual aplicada (cIpcaFrac/dcCorrFrac) ; spread = corrSpread (2%).
+  //  • "PRÉ"  = carrego do deságio em JUROS COMPOSTOS: o preço de compra puxa até a face REALIZÁVEL
+  //      (face × fator de acordo) ao longo do prazo — PRÉ = (faceRealizável/preço)^(1/T) − 1.
+  //      Sem deságio (preço = face realizável) o PRÉ é exatamente 0. Reconcilia ≈ com a TIR:
+  //      (1+TIR) ≈ (1+PRÉ) × (1 + (IPCA+2%)·T)^(1/T).
+  const ipcaSimples = (dcCorrFrac > 0) ? cIpcaFrac / dcCorrFrac : 0;   // IPCA a.a. (simples) = a da ETTJ
+  const spreadSimples = inp.corrSpread;                                // spread a.a. (simples) = 2%
+  const correcaoSimples = ipcaSimples + spreadSimples;                 // "IPCA + 2%" (simples)
+  const firstOut = cfs.findIndex(c => c < 0);                          // data real do desembolso (1º fluxo negativo)
+  const desembDate = (firstOut >= 0) ? dts[firstOut] : base;
+  const Teff = (serial(bullet) - serial(desembDate)) / 365;            // prazo desembolso -> pagamento (clock da TIR)
   const fatorAc = inp.temAcordo ? inp.acordoFator : 1;
-  // IPCA da decomposição = correção de IPCA (sobre a causa, via fator de acordo) como retorno sobre o preço
-  const ipcaSimples = (Tanos > 0 && precoPago) ? cIpcaFrac * causa * fatorAc / precoPago / Tanos : 0;
-  const retornoSimples = (Tanos > 0 && precoPago) ? (recLiq / precoPago - 1) / Tanos : 0;
-  const preSimples = retornoSimples - ipcaSimples;
+  const faceRealizavel = face * fatorAc;                               // o que de fato se recebe de "face" (pós-acordo)
+  const preComposto = (Teff > 0 && precoPago > 0) ? Math.pow(faceRealizavel / precoPago, 1 / Teff) - 1 : 0;
 
   return { tir, preco: precoPago, desagio, moic, prazoMedio,
            dataPagamento: bullet.toISOString().slice(0, 10),
            jurosPagos: accJur, faceCorrigido: face + accJur,
            earnoutPago, recebidoBrutoBullet, earnoutPctBase,
            recebidoLiquidoBullet: recLiq,
-           ipcaImplicito: ipcaN ? ipcaSum / ipcaN : 0,
-           retornoSimples, ipcaSimples, preSimples,
+           ipcaImplicito: ipcaSimples,   // a IPCA média aplicada = a linha IPCA da decomposição (mesmo número)
+           ipcaSimples, spreadSimples, correcaoSimples, preComposto,
            fluxo: cfs.map((c, i) => ({ date: dts[i].toISOString().slice(0, 10), cf: c })) };
 }
 
@@ -542,16 +552,17 @@ function recalc(){
   const somaLevas = inp.levas.reduce((s,l)=>s+(l.valor||0),0);
   const efPrazo = inp.temAcordo ? inp.acordoPrazo : inp.prazoMeses;
   if(!(inp.face>0) || !(somaLevas>0) || !(efPrazo>0)){
-    ['rTir','rSimples','rIpcaDec','rPre','rPreco','rDes','rMoic','rPrazo','rData','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
+    ['rTir','rCorr','rIpcaDec','rSpread','rPre','rPreco','rDes','rMoic','rPrazo','rData','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
     updateIpcaImpl(inp);   // IPCA implícito ainda aparece (depende só da curva+prazo), não força 0
     $('tblSensX').querySelector('thead').innerHTML=''; ['tblSensX','tblSensEo'].forEach(id=>$(id).querySelector('tbody').innerHTML='');
     return;
   }
   const o=PrecatEngine.price(inp, SNAP, FER);
   $('rTir').textContent=(o.tir*100).toFixed(2)+'%';
-  $('rSimples').textContent=(o.retornoSimples*100).toFixed(1)+'%';
+  $('rCorr').textContent=(o.correcaoSimples*100).toFixed(2)+'%';
   $('rIpcaDec').textContent=(o.ipcaSimples*100).toFixed(2)+'%';
-  $('rPre').textContent=(o.preSimples*100).toFixed(1)+'%';
+  $('rSpread').textContent=(o.spreadSimples*100).toFixed(2)+'%';
+  $('rPre').textContent=(o.preComposto*100).toFixed(1)+'%';
   $('rPreco').textContent=fmtBRL(o.preco);
   $('rDes').textContent=(o.desagio*100).toFixed(1)+'%';
   $('rMoic').textContent=o.moic.toFixed(2)+'x';
