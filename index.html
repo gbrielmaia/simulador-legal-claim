@@ -146,8 +146,10 @@
 
       <div class="panel">
         <h2 class="sec">Precatório</h2>
-        <div class="field"><label>Valor atualizado<span class="help" title="Valor do precatório HOJE (na data-base) — já inclui o valor requisitado + os juros/correção acruados até hoje. É o que é amortizado no pagamento.">i</span></label><span><input type="text" inputmode="decimal" id="face" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
-        <div class="field"><label>Valor requisitado<span class="help" title="Principal (valor requisitado), sem os juros já acruados. O juros simples forward (IPCA+spread) incide sobre ESTE valor, não sobre o valor atualizado (que já tem juros). Deixe 0 para usar o valor atualizado (precatório recém-inscrito).">i</span></label><span><input type="text" inputmode="decimal" id="valorCausa" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field" id="rowFace"><label>Valor atualizado<span class="help" title="Valor do precatório HOJE (na data-base) — já inclui o valor requisitado + os juros/correção acruados até hoje. É o que é amortizado no pagamento.">i</span></label><span><input type="text" inputmode="decimal" id="face" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field" id="rowCausaDC"><label>Valor da causa<span class="help" title="Valor do direito creditório HOJE (na data-base). A correção pré-precatório incide sobre ele até virar precatório; nesse instante o valor corrigido vira o 'Valor requisitado' do precatório (calculado no campo abaixo), sobre o qual passa a incidir o IPCA+spread.">i</span></label><span><input type="text" inputmode="decimal" id="causaDC" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field" id="rowReq"><label>Valor requisitado<span class="help" title="Principal (valor requisitado), sem os juros já acruados. O juros simples forward (IPCA+spread) incide sobre ESTE valor, não sobre o valor atualizado (que já tem juros). Deixe 0 para usar o valor atualizado (precatório recém-inscrito).">i</span></label><span><input type="text" inputmode="decimal" id="valorCausa" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="field" id="rowReqOut"><label>Valor requisitado<span class="help" title="Auto: valor da causa corrigido pela taxa pré-precatório até a data em que vira precatório (o valor requisitado no instante da conversão). É a base sobre a qual incide o IPCA+spread da fase precatório.">i</span></label><span><input type="text" inputmode="decimal" id="reqOut" value="—" readonly tabindex="-1" style="opacity:.7;background:transparent;cursor:default;"><span class="suffix">R$</span></span></div>
         <div class="field"><label>Valor a pagar<span class="help" title="Preço total da aquisição. À vista = pago de uma vez na data de início; parcelado = dividido em N parcelas iguais mensais a partir da data de início.">i</span></label><span><input type="text" inputmode="decimal" id="valorPagar" value="0,00" oninput="regenParcelas();recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
         <div class="field"><label>Data de início<span class="help" title="Data em que a operação começa (correção e desembolso). Default = data-base da ETTJ. O 1º mês é pro-rata a partir dela. A curva é sempre lida pela data-base da ETTJ.">i</span></label><span><input type="date" id="dataInicio" oninput="regenParcelas();recalc()"></span></div>
 
@@ -407,18 +409,22 @@ function price(inp, snap, ferSet){
   // acumulam TODO mês (sem o corte do bullet que gateia a correção do sub-ledger).
   const fatorCross = inp.temAcordo ? inp.acordoFator : 1;
   let faceCorrFull = face;
+  let preAcum = 0; // correção pré acumulada até a conversão (juros simples sobre a causa); remarca a base do pós
   let eoZera = { estado: "NAO_ZERA", data: null, valor: null };
   for (let m = 1; m <= NMONTHS; m++){
     // precatório
     precBoP[m] = (m === 1) ? face : precEoP[m - 1];
     let jur = 0;
     if (sBullet >= serial(date[m])){
-      // juros simples actual/365 sobre o principal (corrige o sub-acúmulo do template, que usava /dc)
-      // se JÁ é precatório, corrige por IPCA+spread desde o mês 1 (sem fase pré); senão pré até vira_data
-      if (!inp.ehPrecatorio && serial(date[m]) <= sVira)
-        jur = (idxRate(inp.corrPreIdx || "Pré", m, "corr") + inp.corrPre) * dc[m] / 365 * causa;  // pré-precatório (índice + taxa) sobre a causa
-      else {
-        jur = (idxRate(inp.corrIdx, m, "corr") + inp.corrSpread) * dc[m] / 365 * causa;            // pós-precatório (índice + spread) sobre a causa
+      // juros simples actual/365. Fase pré (índice+taxa) sobre a CAUSA (requisitado). Fase pós
+      // (IPCA+spread) sobre a causa REMARCADA = requisitado + correção pré acumulada até a conversão
+      // (o "valor requisitado no instante em que virou precatório"), não sobre o requisitado original.
+      // Como o loop é cronológico, ao chegar num mês pós o preAcum já somou toda a fase pré.
+      if (!inp.ehPrecatorio && serial(date[m]) <= sVira){
+        jur = (idxRate(inp.corrPreIdx || "Pré", m, "corr") + inp.corrPre) * dc[m] / 365 * causa;  // pré-precatório sobre a causa
+        preAcum += jur;                                                                            // acumula correção pré
+      } else {
+        jur = (idxRate(inp.corrIdx, m, "corr") + inp.corrSpread) * dc[m] / 365 * (causa + preAcum); // pós sobre a causa remarcada
         cIpcaFrac += idxRate(inp.corrIdx, m, "corr") * dc[m] / 365;  // só a parte de IPCA (sem spread), fração
         dcCorrFrac += dc[m] / 365;                                   // tempo da janela de correção (p/ média)
       }
@@ -436,10 +442,11 @@ function price(inp, snap, ferSet){
     hurEoP[m] = hurBoP[m] + hurJur;
 
     // crossover earn-out: recebido full (correção ungated × fator) vs piso full (hurEoP)
-    const rateCF = (!inp.ehPrecatorio && serial(date[m]) <= sVira)
+    const naPre = (!inp.ehPrecatorio && serial(date[m]) <= sVira);
+    const rateCF = naPre
       ? (idxRate(inp.corrPreIdx || "Pré", m, "corr") + inp.corrPre)
       : (idxRate(inp.corrIdx, m, "corr") + inp.corrSpread);
-    faceCorrFull += rateCF * dc[m] / 365 * causa;
+    faceCorrFull += rateCF * dc[m] / 365 * (naPre ? causa : causa + preAcum);  // pós usa a causa remarcada (espelha o sub-ledger)
     if (eoZera.estado === "NAO_ZERA" && faceCorrFull * fatorCross <= hurEoP[m])  // 1º mês recebido ≤ piso
       eoZera = (m === 1) ? { estado: "NASCE_ZERADO", data: null, valor: null }
                          : { estado: "ZERA", data: isoDate(date[m]), valor: hurEoP[m] };
@@ -515,7 +522,7 @@ function price(inp, snap, ferSet){
            detalhe: {
              curva: { dataBase: snap.data_base, preParams: pre, ipcaRealParams: ipca },
              linhas: linhas.slice(1).filter(r => r && (r.sdate <= sBullet || r.fluxo !== 0 || r.earnout !== 0)),
-             comp: { face, causa, correcaoTotal: accJur, faceCorrigido: face + accJur,
+             comp: { face, causa, causaPos: causa + preAcum, correcaoPre: preAcum, correcaoTotal: accJur, faceCorrigido: face + accJur,
                      fatorAcordo: fatorAc, earnoutPago, recebidoLiquido: recLiq, preco: precoPago,
                      desagio, tir, correcaoSimples, ipcaSimples, spreadSimples, preComposto,
                      prazoMedio, Teff, dataPagamento: bullet.toISOString().slice(0, 10) } } };
@@ -612,6 +619,11 @@ function toggleAdv(){ $('advBody').classList.toggle('hide'); $('advH').classList
 
 function sync(){ // mostra/esconde conforme os segmentados
   const ehP=EHPREC, eo=TEMEO, ac=TEMAC;
+  // valores: precatório -> "Valor atualizado" + "Valor requisitado" (input); DC -> "Valor da causa" (input) + "Valor requisitado" (auto)
+  $('rowFace').classList.toggle('hide', !ehP);
+  $('rowReq').classList.toggle('hide', !ehP);
+  $('rowCausaDC').classList.toggle('hide', ehP);
+  $('rowReqOut').classList.toggle('hide', ehP);
   $('hdrPreFase').classList.toggle('hide', ehP);
   $('rowVira').classList.toggle('hide', ehP);
   $('rowPre').classList.toggle('hide', ehP);
@@ -629,8 +641,12 @@ function readInputs(){
     ? PrecatEngine.buildLevas('avista', di, V, 1)
     : (PARCELAS.length ? PARCELAS.map(p=>({date:p.date, valor:p.valor}))
                        : PrecatEngine.buildLevas('parcelado', di, V, Math.max(1, num('nParcelas'))));
+  // DC: "Valor da causa" é a base do pré (engine causa=face, remarcada p/ causaPos no pós); requisitado é derivado (read-only).
+  // Precatório: "Valor atualizado" (face) + "Valor requisitado" (valorCausa) como inputs diretos.
+  const faceIn = EHPREC ? money('face') : money('causaDC');
+  const causaIn = EHPREC ? money('valorCausa') : 0;
   return { ehPrecatorio:EHPREC, modo:MODO, temEarnout:TEMEO, temAcordo:TEMAC,
-    face:money('face'), valorCausa:money('valorCausa'), viraMeses:num('viraMeses'), prazoMeses:num('prazo'),
+    face:faceIn, valorCausa:causaIn, viraMeses:num('viraMeses'), prazoMeses:num('prazo'),
     corrIdx:"IPCA", corrSpread:num('corrSpread')/100,
     corrPreIdx:$('corrPreIdx').value, corrPre:num('corrPre')/100,
     levas, acordoFator:num('acFator')/100, acordoPrazo:num('acPrazo'),
@@ -664,12 +680,15 @@ function recalc(){
   const efPrazo = inp.temAcordo ? inp.acordoPrazo : inp.prazoMeses;
   if(!(inp.face>0) || !(somaLevas>0) || !(efPrazo>0)){
     ['rTir','rCorr','rPre','rPreco','rDes','rMoic','rData','rEoZera','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
+    if(!EHPREC) $('reqOut').value='—';   // Valor requisitado (auto) só existe no modo DC
     $('rowEoZera').classList.add('hide');
     updateIpcaImpl(inp);   // IPCA implícito ainda aparece (depende só da curva+prazo), não força 0
     $('tblSensX').querySelector('thead').innerHTML=''; ['tblSensX','tblSensEo'].forEach(id=>$(id).querySelector('tbody').innerHTML='');
     return;
   }
   const o=PrecatEngine.price(inp, SNAP, FER);
+  // Valor requisitado (auto, modo DC) = valor da causa corrigido até virar precatório (causaPos)
+  if(!EHPREC) $('reqOut').value=fmtBRL(o.detalhe.comp.causaPos);
   $('rTir').textContent=(o.tir*100).toFixed(2)+'%';
   $('rCorr').textContent=(o.correcaoSimples*100).toFixed(2)+'%';
   $('rPre').textContent=(o.preComposto*100).toFixed(1)+'%';
@@ -762,7 +781,7 @@ function goalSeek(){
 // ---- cenário <-> URL ----
 function buildState(){
   return { ehP:EHPREC, eo:TEMEO, ac:TEMAC, modo:MODO,
-    face:$('face').value, vc:$('valorCausa').value, vira:num('viraMeses'), prazo:num('prazo'),
+    face:$('face').value, vc:$('valorCausa').value, cdc:$('causaDC').value, vira:num('viraMeses'), prazo:num('prazo'),
     cs:num('corrSpread'), cpi:$('corrPreIdx').value, cp:num('corrPre'),
     im:IPCAMODE, iv:num('ipcaVal'), vp:$('valorPagar').value, di:$('dataInicio').value, np:num('nParcelas'), ta:num('tirAlvo'),
     dn:$('docNome').value, dd:$('docData').value, parc:PARCELAS,
@@ -771,7 +790,7 @@ function buildState(){
 }
 function applyState(s){ try{
   EHPREC=!!s.ehP; TEMEO=!!s.eo; TEMAC=!!s.ac;
-  $('face').value=s.face; if(s.vc)$('valorCausa').value=s.vc; $('viraMeses').value=s.vira; $('prazo').value=s.prazo;
+  $('face').value=s.face; if(s.vc)$('valorCausa').value=s.vc; if(s.cdc)$('causaDC').value=s.cdc; $('viraMeses').value=s.vira; $('prazo').value=s.prazo;
   $('corrSpread').value=s.cs; if(s.cpi)$('corrPreIdx').value=s.cpi; $('corrPre').value=s.cp;
   $('ipcaVal').value=s.iv; $('valorPagar').value=s.vp||s.preco||'0,00'; if(s.di)$('dataInicio').value=s.di; if(s.np)$('nParcelas').value=s.np; $('tirAlvo').value=s.ta;
   $('acFator').value=s.af; $('acPrazo').value=s.ap; $('eoIdx').value=s.ei; $('eoSpread').value=s.es;
