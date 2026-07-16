@@ -147,6 +147,7 @@
       <div class="panel">
         <h2 class="sec">Precatório</h2>
         <div class="field" id="rowFace"><label>Valor atualizado<span class="help" title="Valor do crédito HOJE (na data-base). No precatório é o que é amortizado no pagamento. No direito creditório é o valor atual sobre o qual o juro pré (calculado sobre o Valor da causa) é somado para formar o Valor requisitado.">i</span></label><span><input type="text" inputmode="decimal" id="face" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
+        <div class="hide" id="noticeVfCalc" style="font-size:10.5px;color:var(--ok);margin:-2px 0 6px;">valor recebido da calculadora</div>
         <div class="field" id="rowVC"><label><span id="lblVC">Valor requisitado</span><span class="help" id="helpVC" title="Principal (valor requisitado): base do juro simples IPCA+spread da fase precatório.">i</span></label><span><input type="text" inputmode="decimal" id="valorCausa" value="0,00" oninput="recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
         <div class="field" id="rowReqOut"><label>Valor requisitado<span class="help" title="Auto: Valor atualizado + juro simples pré-precatório (calculado sobre o Valor da causa) até virar precatório. É a base sobre a qual incide o IPCA+spread (simples) da fase precatório.">i</span></label><span><input type="text" inputmode="decimal" id="reqOut" value="—" readonly tabindex="-1" style="opacity:.7;background:transparent;cursor:default;"><span class="suffix">R$</span></span></div>
         <div class="field"><label>Valor a pagar<span class="help" title="Preço total da aquisição. À vista = pago de uma vez na data de início; parcelado = dividido em N parcelas iguais mensais a partir da data de início.">i</span></label><span><input type="text" inputmode="decimal" id="valorPagar" value="0,00" oninput="regenParcelas();recalc()" onblur="maskMoney(this)"><span class="suffix">R$</span></span></div>
@@ -987,10 +988,25 @@ function exportarXlsx(){
     .catch(e=>toast('Falha ao gerar a planilha: '+(e.message||e)));
 }
 
+// F2 (cross-produto calculadora->simulador): ?vf=<valor_corrigido_hoje>&origem=calculadora
+// pre-preenche "Valor atualizado" (campo #face) e dispara o recalc padrao da pagina -- NAO mexe
+// no engine nem em nenhuma conta, so' preenchimento de input (mesmo padrao do ?c= de estado).
+function aplicaValorDaCalculadora(){
+  const params = new URLSearchParams(location.search);
+  const vf = params.get('vf');
+  if (vf === null) return;
+  const n = parseFloat(String(vf).replace(',', '.'));
+  if (!isFinite(n) || n <= 0) return;
+  $('face').value = fmtBRL(n);
+  if (params.get('origem') === 'calculadora') $('noticeVfCalc').classList.remove('hide');
+  recalc();
+}
+
 window.addEventListener('DOMContentLoaded',()=>{
   $('curvalbl').textContent='Curva ETTJ '+SNAP.data_base;
   const c=new URLSearchParams(location.search).get('c');
   if(c){ const s=decodeState(c); if(s) applyState(s); }
+  aplicaValorDaCalculadora();
   // reflete os segmentados (tipo/earn-out/acordo/pagamento/IPCA) restaurados nos controles
   $('tDC').classList.toggle('on',!EHPREC); $('tPrec').classList.toggle('on',EHPREC);
   $('eoNao').classList.toggle('on',!TEMEO); $('eoSim').classList.toggle('on',TEMEO);
