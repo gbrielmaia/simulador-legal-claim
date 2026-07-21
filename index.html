@@ -155,9 +155,9 @@
 
         <div class="subhdr" id="hdrPreFase">Fase pré-precatório</div>
         <div class="field" id="rowVira"><label>Vira precatório em<span class="help" title="Meses até o crédito ser efetivamente inscrito como precatório. Até lá corrige pela 'Correção pré-precatório'.">i</span></label><span><input type="number" id="viraMeses" value="0" oninput="recalc()"><span class="suffix">meses</span></span></div>
-        <div class="field" id="rowPre"><label>Correção pré-precatório<span class="help" title="Índice + taxa que corrigem o crédito ANTES de virar precatório. Pré = taxa fixa que você digita; CDI = curva nominal + spread; IPCA = inflação (campo IPCA abaixo) + spread.">i</span></label><span>
-          <select id="corrPreIdx" onchange="recalc()"><option selected>Pré</option><option>IPCA</option><option>CDI</option></select>
-          <span class="suffix" id="connPre">+</span><input type="number" id="corrPre" value="0" step="0.1" oninput="recalc()"><span class="suffix">% a.a.</span></span></div>
+        <div class="field" id="rowPre"><label>Correção pré-precatório<span class="help" title="Índice + taxa que corrigem o crédito ANTES de virar precatório. Pré = taxa fixa que você digita; CDI = curva nominal + spread; IPCA = inflação (campo IPCA abaixo) + spread; IPCA + Taxa legal = regime do art. 406 CC (Tema 1.419), projetado pela curva como max(IPCA, nominal) — piso 0 da taxa legal, sem spread.">i</span></label><span>
+          <select id="corrPreIdx" onchange="recalc()"><option selected>Pré</option><option>IPCA</option><option>CDI</option><option>IPCA + Taxa legal</option></select>
+          <span class="suffix" id="connPre">+</span><span id="preSpreadVal"><input type="number" id="corrPre" value="0" step="0.1" oninput="recalc()"><span class="suffix">% a.a.</span></span></span></div>
 
         <div class="subhdr">Fase precatório</div>
         <div class="field"><label>Prazo até pagamento<span class="help" title="Meses entre virar precatório e o pagamento (bullet).">i</span></label><span><input type="number" id="prazo" value="0" oninput="recalc()"><span class="suffix">meses</span></span></div>
@@ -337,7 +337,7 @@ function xirr(cfs, dates){
 //     • "adicionado" = honorario POR FORA (ex.: sucumbencial pago pelo Estado) -> NAO afeta o
 //       retorno (honFator=1); so' informado. Paridade: default (0/adicionado) => calculo inalterado.
 //   face, viraMeses, prazoMeses, corrIdx:"Pré"|"IPCA"|"CDI", corrSpread,
-//   corrPreIdx:"Pré"|"IPCA"|"CDI" (default "Pré"=fixo), corrPre (taxa/spread do pré-precatório),
+//   corrPreIdx:"Pré"|"IPCA"|"CDI"|"IPCA + Taxa legal" (default "Pré"=fixo), corrPre (taxa/spread do pré-precatório),
 //   levas:[{date:"YYYY-MM-DD",valor}], acordoFator, acordoPrazo,
 //   eoIdx, eoSpread, eoJanelas:[{de,ate,pct}], eo2Valor, eo2Mes, sensPricef, sensPrazoDelta,
 //   ipcaOverride: se != null, substitui o IPCA breakeven implícito da curva pelo valor (a.a., decimal)}
@@ -400,7 +400,10 @@ function price(inp, snap, ferSet){
   //   "Pré"  = prefixado → 0 (o spread/campo É a taxa fixa)
   //   "CDI"  = curva nominal (earn-out usa Pré spot p/ paridade; correção usa FRA forward)
   //   "IPCA" = inflação implícita da ETTJ OU manual (IPCA[m] já respeita o override)
+  //   "IPCA + Taxa legal" = regime do art. 406 CC (Tema 1.419): IPCA + max(0, nominal-IPCA) =
+  //                         max(IPCA, nominal). Piso 0 da taxa legal embutido no max. So' contexto "corr".
   const idxRate = (name, m, ctx) => name === "Pré" ? 0
+    : name === "IPCA + Taxa legal" ? Math.max(IPCA[m], ctx === "eo" ? Pre[m] : FRA[m])
     : (name === "IPCA" ? IPCA[m] : (ctx === "eo" ? Pre[m] : FRA[m]));
 
   // levas -> desembolso por mês (r49): soma das levas cuja data cai no mês
@@ -765,7 +768,7 @@ function readInputs(){
   return { ehPrecatorio:EHPREC, modo:MODO, temEarnout:TEMEO, temAcordo:TEMAC,
     face:money('face'), valorCausa:money('valorCausa'), viraMeses:num('viraMeses'), prazoMeses:num('prazo'),
     corrIdx:"IPCA", corrSpread:num('corrSpread')/100,
-    corrPreIdx:$('corrPreIdx').value, corrPre:num('corrPre')/100,
+    corrPreIdx:$('corrPreIdx').value, corrPre:($('corrPreIdx').value==='IPCA + Taxa legal') ? 0 : num('corrPre')/100,
     levas, acordoFator:num('acFator')/100, acordoPrazo:num('acPrazo'),
     eoIdx:$('eoIdx').value, eoSpread:num('eoSpread')/100,
     eoJanelas:JAN_DEF.map(w=>({de:w[0],ate:w[1],pct:w[2]/100})),
@@ -790,7 +793,9 @@ function updateIpcaImpl(inp){
 function recalc(){
   const inp=readInputs();
   // conectores "+" (somem quando índice = Pré) — sempre atualizam
-  $('connPre').classList.toggle('hide', inp.corrPreIdx==='Pré');
+  const preTL = inp.corrPreIdx==='IPCA + Taxa legal';
+  $('connPre').classList.toggle('hide', inp.corrPreIdx==='Pré' || preTL);  // "+" some no Pré e no regime legal
+  $('preSpreadVal').classList.toggle('hide', preTL);                        // campo de spread + "% a.a." somem so' no regime legal
   $('connCorr').classList.toggle('hide', inp.corrIdx==='Pré');
   $('connEo').classList.toggle('hide', inp.eoIdx==='Pré');
   // MODO TEMPLATE: enquanto faltar face, preço ou prazo, mostra tudo em branco (evita cálculo com campo esquecido)
