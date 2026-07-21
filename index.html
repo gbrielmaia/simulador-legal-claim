@@ -177,6 +177,9 @@
           <div style="font-size:11px;color:var(--ink-soft);margin-top:7px;text-align:right;">Soma das parcelas: <b id="parcSoma" style="font-family:'IBM Plex Mono',monospace;color:var(--gold)">0,00</b></div>
         </div>
         <div class="field"><label>TIR-alvo<span class="help" title="Resolve o 'Valor a pagar' para que a TIR fique igual à meta. Útil para definir o quanto pagar.">i</span></label><span class="gsbox"><input type="number" id="tirAlvo" value="0" step="0.5"><span class="suffix">%</span><button class="btn noprint" onclick="goalSeek()">resolver preço</button></span></div>
+        <div class="field"><label>Honorário<span class="help" title="Honorário sobre a realização do crédito. EMBUTIDO = contratual (quota-litis): sai do que o comprador realiza, então REDUZ sua TIR/MOIC (retorno já sai líquido de honorário). ADICIONADO = por fora (ex.: sucumbencial, pago pelo Estado): não afeta o retorno — só informa o valor. Vazio = sem honorário.">i</span></label><span>
+          <select id="inHonorarioModo" onchange="recalc()"><option value="adicionado" selected>Adicionado (por fora / sucumbencial)</option><option value="embutido">Embutido (contratual, reduz minha realização)</option></select>
+          <input type="number" id="inHonorarioPct" step="0.01" placeholder="—" oninput="recalc()"><span class="suffix">%</span></span></div>
       </div>
 
       <div class="panel">
@@ -201,12 +204,14 @@
     <div>
       <div class="panel">
         <h2 class="sec">Resultado</h2>
-        <div class="res"><span class="k">TIR (a.a.)<span class="help" title="Taxa interna de retorno anual do fluxo (XIRR), base 365. Reconcilia ≈ (1+PRÉ)×(1+(IPCA+2%)·prazo)^(1/prazo)−1.">i</span></span><span class="v big" id="rTir">—</span></div>
+        <div class="res"><span class="k">TIR (a.a.)<span id="tirHonTag" class="hide" style="color:var(--gold);font-weight:600"> · líq. honorário</span><span class="help" title="Taxa interna de retorno anual do fluxo (XIRR), base 365. Reconcilia ≈ (1+PRÉ)×(1+(IPCA+2%)·prazo)^(1/prazo)−1.">i</span></span><span class="v big" id="rTir">—</span></div>
+        <div class="res sub hide" id="rowTirBruta"><span class="k">TIR / MOIC brutas (sem honorário)<span class="help" title="Retorno antes do honorário contratual embutido, para comparação. A TIR/MOIC acima já saem líquidas desse honorário.">i</span></span><span class="v" id="rTirBruta">—</span></div>
         <div class="res"><span class="k">IPCA + 2% (a.a., juros simples)<span class="help" title="Correção contratual do título: o administrador corrige a CAUSA por IPCA + spread em juros simples. IPCA = a média da ETTJ/manual (mesmo número do campo IPCA das premissas) somada ao spread (default 2%).">i</span></span><span class="v" id="rCorr">—</span></div>
         <div class="res"><span class="k">PRÉ (a.a., juros compostos)<span class="help" title="Carrego do deságio: o preço de compra puxa até a face REALIZÁVEL (face × fator de acordo) ao longo do prazo. PRÉ = (face realizável/preço)^(1/prazo) − 1. Sem deságio é 0.">i</span></span><span class="v" id="rPre">—</span></div>
         <div class="res"><span class="k">Preço total</span><span class="v" id="rPreco">—</span></div>
         <div class="res"><span class="k">Fator deságio<span class="help" title="Quanto você paga como fração do valor atualizado nominal de hoje (preço ÷ valor atualizado = 1 − deságio).">i</span></span><span class="v" id="rDes">—</span></div>
         <div class="res"><span class="k">MOIC<span class="help" title="Múltiplo sobre o capital: total recebido ÷ preço pago.">i</span></span><span class="v" id="rMoic">—</span></div>
+        <div class="res hide" id="rowHon"><span class="k" id="kHon">Honorário</span><span class="v" id="rHon">—</span></div>
         <div class="res"><span class="k">Pagamento em</span><span class="v" id="rData">—</span></div>
         <div class="res hide" id="rowEoZera"><span class="k">Earn-out zera em<span class="help" title="Âncora de negociação: data em que o piso do earn-out (preço remarcado a piso-índice + spread, composto) alcança o valor a receber (face corrigido no tempo × fator de acordo). A partir dela o earn-out é zero — independe do prazo e do % das janelas. 'nasce zerado' = o piso já supera o recebido hoje; 'não zera' = o piso cresce devagar demais e não alcança no horizonte.">i</span></span><span class="v" id="rEoZera">—</span></div>
       </div>
@@ -325,6 +330,12 @@ function xirr(cfs, dates){
 
 // ---------- preço/TIR (porta da aba Motor) ----------
 // inputs: {ehPrecatorio, modo:"avista"|"parcelado", temEarnout, temAcordo,
+//   honorarioPct (decimal, ex.: 0.30; default 0 = sem honorario),
+//   honorarioModo:"embutido"|"adicionado" (default "adicionado"):
+//     • "embutido"  = honorario contratual (quota-litis) que SAI do que o comprador realiza ->
+//       reduz o `recebido` por (1-honorarioPct) -> baixa TIR/MOIC (liquidos de honorario).
+//     • "adicionado" = honorario POR FORA (ex.: sucumbencial pago pelo Estado) -> NAO afeta o
+//       retorno (honFator=1); so' informado. Paridade: default (0/adicionado) => calculo inalterado.
 //   face, viraMeses, prazoMeses, corrIdx:"Pré"|"IPCA"|"CDI", corrSpread,
 //   corrPreIdx:"Pré"|"IPCA"|"CDI" (default "Pré"=fixo), corrPre (taxa/spread do pré-precatório),
 //   levas:[{date:"YYYY-MM-DD",valor}], acordoFator, acordoPrazo,
@@ -357,6 +368,14 @@ function price(inp, snap, ferSet){
   const reqBase = inp.ehPrecatorio ? causa : face;
   const levas = inp.levas || [];
   const precoPago = levas.reduce((s, l) => s + (l.valor || 0), 0) * pricef; // C34
+
+  // HONORÁRIO (2026-07-21): honorário contratual embutido reduz a realização do comprador.
+  // honModo="embutido" => honFator=(1-pct): o `recebido` (a coleta do precatório) sai líquido de
+  // honorário -> baixa TIR/MOIC. "adicionado"/por fora (ex.: sucumbencial) => honFator=1 (não afeta).
+  // Default (pct=0) => honFator=1 => cálculo idêntico ao anterior (paridade preservada).
+  const honPct = (inp.honorarioPct > 0) ? inp.honorarioPct : 0;
+  const honModo = inp.honorarioModo || "adicionado";
+  const honFator = (honModo === "embutido" && honPct > 0) ? (1 - honPct) : 1;
 
   // timeline meses 1..NMONTHS
   const date = [], dc = [], du = [], Pre = [], JR = [], IPCA = [], FRA = [], ten = [];
@@ -471,7 +490,7 @@ function price(inp, snap, ferSet){
     earnoutPago += r63 + r64;
     if (isBullet) { recebidoBrutoBullet = recebido; earnoutPctBase = pctJanela(m); bulletIdx = m; }
     const des = desemb(m) * pricef;
-    r42[m] = recebido - r63 - r64 - des;
+    r42[m] = recebido * honFator - r63 - r64 - des;   // honFator<1 só quando honorário embutido
     dates42[m] = date[m];
 
     // linha de detalhamento (read-only; não afeta a matemática)
@@ -522,6 +541,9 @@ function price(inp, snap, ferSet){
            jurosPagos: accJur, faceCorrigido: face + accJur,
            earnoutPago, recebidoBrutoBullet, earnoutPctBase,
            recebidoLiquidoBullet: recLiq,
+           // HONORÁRIO: valor = pct × recebido bruto do bullet; fator aplicado ao fluxo (só embutido).
+           // tir/moic acima já são LÍQUIDOS de honorário quando modo="embutido".
+           honorario: { pct: honPct, modo: honModo, fator: honFator, valor: honPct * recebidoBrutoBullet },
            ipcaImplicito: ipcaSimples,   // a IPCA média aplicada = a linha IPCA da decomposição (mesmo número)
            ipcaSimples, spreadSimples, correcaoSimples, preComposto,
            earnoutZeragem: eoZera,   // { estado: "ZERA"|"NASCE_ZERADO"|"NAO_ZERA", data, valor }
@@ -748,6 +770,8 @@ function readInputs(){
     eoIdx:$('eoIdx').value, eoSpread:num('eoSpread')/100,
     eoJanelas:JAN_DEF.map(w=>({de:w[0],ate:w[1],pct:w[2]/100})),
     eo2Valor:0, eo2Mes:18, sensPricef:1, sensPrazoDelta:0, dataInicio:di,
+    honorarioPct: (($('inHonorarioPct').value||'').trim()==='' ? 0 : num('inHonorarioPct')/100),
+    honorarioModo: $('inHonorarioModo').value,
     ipcaOverride: (IPCAMODE==='manual') ? num('ipcaVal')/100 : null };
 }
 // IPCA implícito da ETTJ depende SÓ da curva + horizonte (vira/bullet), não de preço/face.
@@ -777,6 +801,7 @@ function recalc(){
     ['rTir','rCorr','rPre','rPreco','rDes','rMoic','rData','rEoZera','cFace','cJuros','cFaceC','cFator','cEo','cRecLiq','cPreco'].forEach(id=>$(id).textContent='—');
     if(!EHPREC) $('reqOut').value='—';   // Valor requisitado (auto) só existe no modo DC
     $('rowEoZera').classList.add('hide');
+    $('rowHon').classList.add('hide'); $('rowTirBruta').classList.add('hide'); $('tirHonTag').classList.add('hide');
     updateIpcaImpl(inp);   // IPCA implícito ainda aparece (depende só da curva+prazo), não força 0
     $('tblSensX').querySelector('thead').innerHTML=''; ['tblSensX','tblSensEo'].forEach(id=>$(id).querySelector('tbody').innerHTML='');
     return;
@@ -808,6 +833,29 @@ function recalc(){
   $('cEo').textContent=fmtBRL(o.earnoutPago);
   $('cRecLiq').textContent=fmtBRL(o.recebidoLiquidoBullet);
   $('cPreco').textContent=fmtBRL(o.preco);
+  // ---- honorário ----
+  const hon=o.honorario, temHon=hon.pct>0;
+  $('rowHon').classList.toggle('hide', !temHon);
+  if(temHon){
+    const pctTxt=(hon.pct*100).toFixed(2).replace('.',',')+'%';
+    if(hon.modo==='embutido'){
+      // as TIR/MOIC de `o` já saem líquidas; a bruta vem de um 2º cálculo com honorarioPct:0
+      const oBr=PrecatEngine.price(Object.assign({},inp,{honorarioPct:0}),SNAP,FER);
+      $('kHon').textContent='Honorário embutido ('+pctTxt+')';
+      $('rHon').textContent='− '+fmtBRL(hon.valor);
+      $('tirHonTag').classList.remove('hide');
+      $('rowTirBruta').classList.remove('hide');
+      $('rTirBruta').textContent=(oBr.tir*100).toFixed(2)+'% · '+oBr.moic.toFixed(2)+'x';
+    } else {
+      $('kHon').textContent='Honorário por fora ('+pctTxt+') — não afeta o retorno';
+      $('rHon').textContent='+ '+fmtBRL(hon.valor);
+      $('tirHonTag').classList.add('hide');
+      $('rowTirBruta').classList.add('hide');
+    }
+  } else {
+    $('tirHonTag').classList.add('hide');
+    $('rowTirBruta').classList.add('hide');
+  }
   // ---- sensibilidades ----
   const f2=(x)=>(x*100).toFixed(2)+'%';
   const fmtM=(v)=> (v/1e6).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'M';
@@ -881,6 +929,7 @@ function buildState(){
     im:IPCAMODE, iv:num('ipcaVal'), vp:$('valorPagar').value, di:$('dataInicio').value, np:num('nParcelas'), ta:num('tirAlvo'),
     dn:$('docNome').value, dd:$('docData').value, parc:PARCELAS,
     af:num('acFator'), ap:num('acPrazo'), ei:$('eoIdx').value, es:num('eoSpread'),
+    hon:$('inHonorarioPct').value, hm:$('inHonorarioModo').value,
     jan:JAN_DEF };
 }
 function applyState(s){ try{
@@ -889,6 +938,7 @@ function applyState(s){ try{
   $('corrSpread').value=s.cs; if(s.cpi)$('corrPreIdx').value=s.cpi; $('corrPre').value=s.cp;
   $('ipcaVal').value=s.iv; $('valorPagar').value=s.vp||s.preco||'0,00'; if(s.di)$('dataInicio').value=s.di; if(s.np)$('nParcelas').value=s.np; $('tirAlvo').value=s.ta;
   $('acFator').value=s.af; $('acPrazo').value=s.ap; $('eoIdx').value=s.ei; $('eoSpread').value=s.es;
+  if(s.hon!=null)$('inHonorarioPct').value=s.hon; if(s.hm)$('inHonorarioModo').value=s.hm;  // ausente => default (vazio/adicionado)
   if(Array.isArray(s.jan)) JAN_DEF.splice(0,JAN_DEF.length,...s.jan);
   MODO=s.modo||'avista'; IPCAMODE=s.im||'curva';
   if(Array.isArray(s.parc)) PARCELAS=s.parc.map(p=>({date:p.date, valor:p.valor}));
