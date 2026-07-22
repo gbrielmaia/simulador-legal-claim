@@ -196,7 +196,7 @@
         <h2 class="sec adv-h" id="advH" onclick="toggleAdv()">Avançado</h2>
         <div id="advBody" class="hide">
           <div id="boxAcordo">
-            <div class="field"><label>Acordo — fator de deságio<span class="help" title="Percentual dos fluxos que você recebe num acordo direto (haircut). Ex.: 60% = recebe 60% do que o precatório pagaria.">i</span></label><span><input type="number" id="acFator" value="0" step="1" oninput="recalc()"><span class="suffix">%</span></span></div>
+            <div class="field"><label>Acordo — % Valor Face<span class="help" title="% do valor de face que você recebe num acordo direto (haircut). Ex.: 60% = recebe 60% do valor de face que o precatório pagaria.">i</span></label><span><input type="number" id="acFator" value="0" step="1" oninput="recalc()"><span class="suffix">%</span></span></div>
             <div class="field"><label>Acordo — prazo<span class="help" title="Meses até o acordo direto liquidar. SUBSTITUI o 'Prazo até pagamento' da fila normal quando 'Há acordo?' está ligado.">i</span></label><span><input type="number" id="acPrazo" value="0" oninput="recalc()"><span class="suffix">meses</span></span></div>
           </div>
           <div id="boxEo">
@@ -229,7 +229,7 @@
         <div class="res sub"><span class="k">Valor atualizado (hoje)</span><span class="v" id="dFace">—</span></div>
         <div class="res sub"><span class="k">(+) Correção até o pagamento</span><span class="v" id="dCorr">—</span></div>
         <div class="res tot"><span class="k">(=) Corrigido no pagamento</span><span class="v" id="dFaceC">—</span></div>
-        <div class="res sub hide" id="dRowAcordo"><span class="k">(×) Fator de acordo<span class="help" title="Haircut do acordo direto: você recebe esse % dos fluxos.">i</span></span><span class="v" id="dAcordo">—</span></div>
+        <div class="res sub hide" id="dRowAcordo"><span class="k">(×) % Valor Face<span class="help" title="Haircut do acordo direto: você recebe esse % do valor de face.">i</span></span><span class="v" id="dAcordo">—</span></div>
         <div class="res sub hide" id="dRowDesc"><span class="k">(−) Descontos / Contribuições<span class="help" title="Retenções do Ofício Requisitório (previdenciária/IR), proporção fixa do crédito — corrigidas ao pagamento.">i</span></span><span class="v" id="dDesc">—</span></div>
         <div class="res sub hide" id="dRowHon"><span class="k" id="dHonK">(−) Honorário embutido</span><span class="v" id="dHon">—</span></div>
         <div class="res sub hide" id="dRowEo"><span class="k">(−) Earn-out pago</span><span class="v" id="dEo">—</span></div>
@@ -1113,9 +1113,10 @@ function exportarXlsx(){
     .catch(e=>toast('Falha ao gerar a planilha: '+(e.message||e)));
 }
 
-// F2 (cross-produto calculadora->simulador): ?vf=<valor_corrigido_hoje>&origem=calculadora
-// pre-preenche "Valor atualizado" (campo #face) e dispara o recalc padrao da pagina -- NAO mexe
-// no engine nem em nenhuma conta, so' preenchimento de input (mesmo padrao do ?c= de estado).
+// F2 (cross-produto calculadora->simulador): ?vf=<valor_corrigido_hoje>&vc=<valor_da_causa>
+// &hp=<honorario%>&hm=<modo>&desc=<base64 JSON descontos>&nome=<caso>&origem=calculadora
+// pre-preenche os inputs correspondentes e dispara o recalc padrao -- NAO mexe no engine nem em
+// nenhuma conta, so' preenchimento de input (mesmo padrao do ?c= de estado).
 function aplicaValorDaCalculadora(){
   const params = new URLSearchParams(location.search);
   const vf = params.get('vf');
@@ -1123,8 +1124,21 @@ function aplicaValorDaCalculadora(){
   const n = parseFloat(String(vf).replace(',', '.'));
   if (!isFinite(n) || n <= 0) return;
   $('face').value = fmtBRL(n);
+  // Valor da causa -> #valorCausa (no modo DC e' "Valor da causa"; no precatorio, "Valor requisitado")
+  const vc = params.get('vc');
+  if (vc !== null){ const nc = parseFloat(String(vc).replace(',', '.')); if (isFinite(nc) && nc > 0) $('valorCausa').value = fmtBRL(nc); }
+  // honorario (mesmos ids/semantica)
+  const hp = params.get('hp');
+  if (hp){ $('inHonorarioPct').value = hp; const hm = params.get('hm'); if (hm) $('inHonorarioModo').value = hm; }
+  // descontos / contribuicoes
+  const desc = params.get('desc');
+  if (desc){ try { const arr = JSON.parse(decodeURIComponent(escape(atob(desc)))); if (Array.isArray(arr) && arr.length){ DESCONTOS = arr.map(function(d){ return {rotulo: d.rotulo || '', valor: +d.valor || 0}; }); renderDescontos(); } } catch(e){} }
+  // nome do caso -> Nome do credito (DIU)
+  const nome = params.get('nome');
+  if (nome){ $('docNome').value = nome; }
   if (params.get('origem') === 'calculadora') $('noticeVfCalc').classList.remove('hide');
   recalc();
+  updateDocTitle();
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
