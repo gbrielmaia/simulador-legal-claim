@@ -222,7 +222,7 @@
         <div class="res"><span class="k">Fator deságio<span class="help" title="Quanto você paga como fração do valor atualizado nominal de hoje (preço ÷ valor atualizado = 1 − deságio).">i</span></span><span class="v" id="rDes">—</span></div>
         <div class="res"><span class="k">MOIC<span class="help" title="Múltiplo sobre o capital: total recebido ÷ preço pago.">i</span></span><span class="v" id="rMoic">—</span></div>
         <div class="res hide" id="rowHon"><span class="k" id="kHon">Honorário</span><span class="v" id="rHon">—</span></div>
-        <div class="res hide" id="rowDesc"><span class="k">Descontos / contribuições<span class="help" title="Retenções do Ofício Requisitório (prev./IR) deduzidas no pagamento. Reduzem TIR/MOIC na proporção líquido/face (fração fixa do precatório). Mostra o total e o valor líquido = face − descontos.">i</span></span><span class="v" id="rDesc">—</span></div>
+        <div class="res hide" id="rowDesc"><span class="k">Descontos / contribuições<span class="help" title="Retenções do Ofício Requisitório (prev./IR) deduzidas no pagamento. São proporção fixa do crédito, então CORRIGEM junto com o precatório — os valores mostrados (desconto e líquido) já vêm corrigidos ao pagamento, coerentes com o valor atualizado. Reduzem TIR/MOIC na mesma proporção.">i</span></span><span class="v" id="rDesc">—</span></div>
         <div class="res"><span class="k">Pagamento em</span><span class="v" id="rData">—</span></div>
         <div class="res hide" id="rowEoZera"><span class="k">Earn-out zera em<span class="help" title="Âncora de negociação: data em que o piso do earn-out (preço remarcado a piso-índice + spread, composto) alcança o valor a receber (face corrigido no tempo × fator de acordo). A partir dela o earn-out é zero — independe do prazo e do % das janelas. 'nasce zerado' = o piso já supera o recebido hoje; 'não zera' = o piso cresce devagar demais e não alcança no horizonte.">i</span></span><span class="v" id="rEoZera">—</span></div>
       </div>
@@ -569,7 +569,11 @@ function price(inp, snap, ferSet){
            honorario: { pct: honPct, modo: honModo, fator: honFator, valor: honPct * recebidoBrutoBullet },
            // DESCONTOS: fator líquido (fração fixa do precatório) aplicado ao realizado -> tir/moic já
            // saem líquidos de descontos. valorLiquido/total em R$ de hoje (na face); itens = as rubricas.
-           descontos: { total: totalDescontos, fator: liquidoFator, valorLiquido: face - totalDescontos, itens: descontos.slice() },
+           // total/valorLiquido = na FACE (hoje); *Corrigido = no PAGAMENTO (desconto anda junto com
+           // a correcao: cresce na mesma proporcao que o precatorio -> total * faceCorrigido/face).
+           descontos: { total: totalDescontos, fator: liquidoFator, valorLiquido: face - totalDescontos,
+                        totalCorrigido: (face > 0) ? totalDescontos * ((face + accJur) / face) : totalDescontos,
+                        valorLiquidoCorrigido: (face + accJur) * liquidoFator, itens: descontos.slice() },
            ipcaImplicito: ipcaSimples,   // a IPCA média aplicada = a linha IPCA da decomposição (mesmo número)
            ipcaSimples, spreadSimples, correcaoSimples, preComposto,
            earnoutZeragem: eoZera,   // { estado: "ZERA"|"NASCE_ZERADO"|"NAO_ZERA", data, valor }
@@ -867,12 +871,13 @@ function recalc(){
   if(IPCAMODE==='curva') $('ipcaVal').value=(o.ipcaImplicito*100).toFixed(2);
   // composição do recebimento
   $('cFace').textContent=fmtBRL(inp.face);
-  // descontos / contribuições: linha no painel Resultado (como o honorário) — total + líquido na face.
-  // TIR/MOIC já saem reduzidas pelo fator; a cascata "Composição" fica em valores brutos (igual honorário).
+  // descontos / contribuições: linha no painel Resultado (como o honorário). Mostra o desconto
+  // CORRIGIDO ao pagamento (anda junto com o precatório: proporção fixa do crédito), coerente com o
+  // "Valor atualizado corrigido no pagamento". TIR/MOIC já saem reduzidas pelo mesmo fator.
   const desc=o.descontos, temDesc=desc.total>0;
   $('rowDesc').classList.toggle('hide', !temDesc);
   $('tirDescTag').classList.toggle('hide', !temDesc);
-  if(temDesc) $('rDesc').textContent='− '+fmtBRL(desc.total)+' · líquido '+fmtBRL(desc.valorLiquido);
+  if(temDesc) $('rDesc').textContent='− '+fmtBRL(desc.totalCorrigido)+' · líquido '+fmtBRL(desc.valorLiquidoCorrigido);
   $('cJuros').textContent=fmtBRL(o.jurosPagos);
   $('cFaceC').textContent=fmtBRL(o.faceCorrigido);
   $('cRowAcordo').classList.toggle('hide', !inp.temAcordo);
