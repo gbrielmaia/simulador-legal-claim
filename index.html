@@ -182,10 +182,10 @@
         </div>
         <div class="field"><label>TIR-alvo<span class="help" title="Resolve o 'Valor a pagar' para que a TIR fique igual à meta. Útil para definir o quanto pagar.">i</span></label><span class="gsbox"><input type="number" id="tirAlvo" value="0" step="0.5"><span class="suffix">%</span><button class="btn noprint" onclick="goalSeek()">resolver preço</button></span></div>
         <div class="field"><label>Honorário<span class="help" title="Honorário sobre a realização do crédito. EMBUTIDO = contratual (quota-litis): sai do que o comprador realiza, então REDUZ sua TIR/MOIC (retorno já sai líquido de honorário). ADICIONADO = por fora (ex.: sucumbencial, pago pelo Estado): não afeta o retorno — só informa o valor. Vazio = sem honorário.">i</span></label><span>
-          <select id="inHonorarioModo" onchange="recalc()"><option value="adicionado" selected>Adicionado (por fora / sucumbencial)</option><option value="embutido">Embutido (contratual, reduz minha realização)</option></select>
+          <select id="inHonorarioModo" onchange="recalc()"><option value="adicionado" selected>Adicionado (por fora)</option><option value="embutido">Embutido (reduz a realização)</option></select>
           <input type="number" id="inHonorarioPct" step="0.01" placeholder="—" oninput="recalc()"><span class="suffix">%</span></span></div>
         <div class="field" style="display:block">
-          <label>Descontos / Contribuições<span class="help" title="Retenções do Ofício Requisitório (previdenciária SPPREV/INSS, IR/RRA) deduzidas NO PAGAMENTO — o comprador realiza o líquido = face − descontos. Como fração fixa do precatório, andam junto com a correção e reduzem TIR/MOIC na proporção líquido/face. IR só se houver valor (RRA nunca é estimado aqui).">i</span></label>
+          <label>Descontos / Contribuições <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-mute)">(Ofício Requisitório)</span><span class="help" title="Retenções do Ofício Requisitório (previdenciária SPPREV/INSS, IR/RRA) deduzidas NO PAGAMENTO — o comprador realiza o líquido = face − descontos. Como fração fixa do precatório, andam junto com a correção e reduzem TIR/MOIC na proporção líquido/face. IR só se houver valor (RRA nunca é estimado aqui).">i</span></label>
           <table class="parc" id="tblDesc"><tbody></tbody></table>
           <button class="btn noprint" onclick="addDesconto()" style="margin-top:6px">+ desconto</button>
           <div style="font-size:10px;color:var(--ink-soft);margin-top:5px;">Crédito remuneratório pode ter contribuição previdenciária / IR — registre os valores do Ofício Requisitório.</div>
@@ -230,7 +230,7 @@
         <div class="res sub"><span class="k">(+) Correção até o pagamento</span><span class="v" id="dCorr">—</span></div>
         <div class="res tot"><span class="k">(=) Corrigido no pagamento</span><span class="v" id="dFaceC">—</span></div>
         <div class="res sub hide" id="dRowAcordo"><span class="k">(×) Fator de acordo<span class="help" title="Haircut do acordo direto: você recebe esse % dos fluxos.">i</span></span><span class="v" id="dAcordo">—</span></div>
-        <div class="res sub hide" id="dRowDesc"><span class="k">(−) Descontos / contribuições<span class="help" title="Retenções do Ofício Requisitório (previdenciária/IR), proporção fixa do crédito — corrigidas ao pagamento.">i</span></span><span class="v" id="dDesc">—</span></div>
+        <div class="res sub hide" id="dRowDesc"><span class="k">(−) Descontos / Contribuições<span class="help" title="Retenções do Ofício Requisitório (previdenciária/IR), proporção fixa do crédito — corrigidas ao pagamento.">i</span></span><span class="v" id="dDesc">—</span></div>
         <div class="res sub hide" id="dRowHon"><span class="k" id="dHonK">(−) Honorário embutido</span><span class="v" id="dHon">—</span></div>
         <div class="res sub hide" id="dRowEo"><span class="k">(−) Earn-out pago</span><span class="v" id="dEo">—</span></div>
         <div class="res tot"><span class="k">(=) Recebido líquido</span><span class="v" id="dRecLiq">—</span></div>
@@ -252,7 +252,7 @@
 
   <section class="docfoot noprint">
     <div class="field"><label>Nome do crédito (DIU)<span class="help" title="Nome que identifica o crédito/legal claim. Vira o título no PDF impresso.">i</span></label><span><input type="text" id="docNome" oninput="updateDocTitle()" placeholder="ex.: Crédito de Fulano de Tal"></span></div>
-    <div class="field"><label>Data do cálculo<span class="help" title="Data em que o cálculo foi feito. Compõe o título no PDF impresso.">i</span></label><span><input type="date" id="docData" oninput="updateDocTitle()"></span></div>
+    <div class="field"><label>Data do documento<span class="help" title="Data de emissão deste relatório (cosmética) — compõe o título no PDF impresso. Não dirige o cálculo.">i</span></label><span><input type="date" id="docData" oninput="updateDocTitle()"></span></div>
     <div class="docbtns"><button class="btn" onclick="exportarXlsx()">exportar xlsx</button><button class="btn" onclick="copiarLink()">copiar link do cenário</button><button class="btn" onclick="window.print()">imprimir / PDF</button></div>
   </section>
 
@@ -701,22 +701,22 @@ if(typeof window!=="undefined") window.XlsxExport=_XAPI;
 </script>
 <script>
 const SNAP = {
-  "data_base": "2026-07-17",
+  "data_base": "2026-07-21",
   "pre": {
-    "b1": 0.145829072915462,
-    "b2": -0.00728447805013511,
-    "b3": -0.025115803484212,
-    "b4": 0.0255193037712764,
-    "l1": 1.10209393588501,
-    "l2": 0.506236346343821
+    "b1": 0.147413690107577,
+    "b2": -0.00878392745057258,
+    "b3": -0.0252323146522168,
+    "b4": 0.0201329916326547,
+    "l1": 1.36154559282287,
+    "l2": 0.559317978727076
   },
   "ipca": {
-    "b1": 0.0678038997924837,
-    "b2": 0.0649538646112728,
-    "b3": -0.0283310449504636,
-    "b4": 0.0475712772233875,
-    "l1": 5.62348249186108,
-    "l2": 0.431368461561965
+    "b1": 0.0687062346276735,
+    "b2": 0.0642768505084365,
+    "b3": -0.032446185533087,
+    "b4": 0.0480684294705315,
+    "l1": 5.84674766208543,
+    "l2": 0.445656160866843
   }
 };
 const FER = new Set(window.FERIADOS);
@@ -725,6 +725,7 @@ const $ = (id)=>document.getElementById(id);
 const num = (id)=>parseFloat($(id).value)||0;
 const fmtBRL = (v)=> (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtMMYYYY = (iso)=> iso ? iso.slice(5,7)+'/'+iso.slice(0,4) : '—';   // "2030-11-01" -> "11/2030"
+const fmtDataBR = (iso)=> iso ? String(iso).split('-').reverse().join('/') : '—';   // "2030-11-01" -> "01/11/2030"
 const parseMoney = (s)=>{ s=String(s).replace(/\./g,'').replace(',','.').replace(/[^0-9.\-]/g,''); return parseFloat(s)||0; };
 const money = (id)=>parseMoney($(id).value);
 function maskMoney(el){ let s=el.value.replace(/[^\d,]/g,''); const hasC=s.indexOf(',')>=0;
@@ -880,7 +881,7 @@ function recalc(){
   $('rPreco').textContent=fmtBRL(o.preco);
   $('rDes').textContent=((1-o.desagio)*100).toFixed(1)+'%';
   $('rMoic').textContent=o.moic.toFixed(2)+'x';
-  $('rData').textContent=o.dataPagamento;
+  $('rData').textContent=fmtDataBR(o.dataPagamento);
   // data de zeragem do earn-out (âncora de negociação) — só quando há earn-out
   $('rowEoZera').classList.toggle('hide', !inp.temEarnout);
   const z=o.earnoutZeragem;
