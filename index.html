@@ -180,6 +180,12 @@
         <div class="field"><label>Honorário<span class="help" title="Honorário sobre a realização do crédito. EMBUTIDO = contratual (quota-litis): sai do que o comprador realiza, então REDUZ sua TIR/MOIC (retorno já sai líquido de honorário). ADICIONADO = por fora (ex.: sucumbencial, pago pelo Estado): não afeta o retorno — só informa o valor. Vazio = sem honorário.">i</span></label><span>
           <select id="inHonorarioModo" onchange="recalc()"><option value="adicionado" selected>Adicionado (por fora / sucumbencial)</option><option value="embutido">Embutido (contratual, reduz minha realização)</option></select>
           <input type="number" id="inHonorarioPct" step="0.01" placeholder="—" oninput="recalc()"><span class="suffix">%</span></span></div>
+        <div class="field" style="display:block">
+          <label>Descontos / Contribuições<span class="help" title="Retenções do Ofício Requisitório (previdenciária SPPREV/INSS, IR/RRA) deduzidas NO PAGAMENTO — o comprador realiza o líquido = face − descontos. Como fração fixa do precatório, andam junto com a correção e reduzem TIR/MOIC na proporção líquido/face. IR só se houver valor (RRA nunca é estimado aqui).">i</span></label>
+          <table class="parc" id="tblDesc"><tbody></tbody></table>
+          <button class="btn noprint" onclick="addDesconto()" style="margin-top:6px">+ desconto</button>
+          <div style="font-size:10px;color:var(--ink-soft);margin-top:5px;">Crédito remuneratório pode ter contribuição previdenciária / IR — registre os valores do Ofício Requisitório.</div>
+        </div>
       </div>
 
       <div class="panel">
@@ -204,7 +210,7 @@
     <div>
       <div class="panel">
         <h2 class="sec">Resultado</h2>
-        <div class="res"><span class="k">TIR (a.a.)<span id="tirHonTag" class="hide" style="color:var(--gold);font-weight:600"> · líq. honorário</span><span class="help" title="Taxa interna de retorno anual do fluxo (XIRR), base 365. Reconcilia ≈ (1+PRÉ)×(1+(IPCA+2%)·prazo)^(1/prazo)−1.">i</span></span><span class="v big" id="rTir">—</span></div>
+        <div class="res"><span class="k">TIR (a.a.)<span id="tirHonTag" class="hide" style="color:var(--gold);font-weight:600"> · líq. honorário</span><span id="tirDescTag" class="hide" style="color:var(--gold);font-weight:600"> · líq. descontos</span><span class="help" title="Taxa interna de retorno anual do fluxo (XIRR), base 365. Reconcilia ≈ (1+PRÉ)×(1+(IPCA+2%)·prazo)^(1/prazo)−1.">i</span></span><span class="v big" id="rTir">—</span></div>
         <div class="res sub hide" id="rowTirBruta"><span class="k">TIR / MOIC brutas (sem honorário)<span class="help" title="Retorno antes do honorário contratual embutido, para comparação. A TIR/MOIC acima já saem líquidas desse honorário.">i</span></span><span class="v" id="rTirBruta">—</span></div>
         <div class="res"><span class="k">IPCA + 2% (a.a., juros simples)<span class="help" title="Correção contratual do título: o administrador corrige a CAUSA por IPCA + spread em juros simples. IPCA = a média da ETTJ/manual (mesmo número do campo IPCA das premissas) somada ao spread (default 2%).">i</span></span><span class="v" id="rCorr">—</span></div>
         <div class="res"><span class="k">PRÉ (a.a., juros compostos)<span class="help" title="Carrego do deságio: o preço de compra puxa até a face REALIZÁVEL (face × fator de acordo) ao longo do prazo. PRÉ = (face realizável/preço)^(1/prazo) − 1. Sem deságio é 0.">i</span></span><span class="v" id="rPre">—</span></div>
@@ -212,6 +218,7 @@
         <div class="res"><span class="k">Fator deságio<span class="help" title="Quanto você paga como fração do valor atualizado nominal de hoje (preço ÷ valor atualizado = 1 − deságio).">i</span></span><span class="v" id="rDes">—</span></div>
         <div class="res"><span class="k">MOIC<span class="help" title="Múltiplo sobre o capital: total recebido ÷ preço pago.">i</span></span><span class="v" id="rMoic">—</span></div>
         <div class="res hide" id="rowHon"><span class="k" id="kHon">Honorário</span><span class="v" id="rHon">—</span></div>
+        <div class="res hide" id="rowDesc"><span class="k">Descontos / contribuições<span class="help" title="Retenções do Ofício Requisitório (prev./IR) deduzidas no pagamento. Reduzem TIR/MOIC na proporção líquido/face (fração fixa do precatório). Mostra o total e o valor líquido = face − descontos.">i</span></span><span class="v" id="rDesc">—</span></div>
         <div class="res"><span class="k">Pagamento em</span><span class="v" id="rData">—</span></div>
         <div class="res hide" id="rowEoZera"><span class="k">Earn-out zera em<span class="help" title="Âncora de negociação: data em que o piso do earn-out (preço remarcado a piso-índice + spread, composto) alcança o valor a receber (face corrigido no tempo × fator de acordo). A partir dela o earn-out é zero — independe do prazo e do % das janelas. 'nasce zerado' = o piso já supera o recebido hoje; 'não zera' = o piso cresce devagar demais e não alcança no horizonte.">i</span></span><span class="v" id="rEoZera">—</span></div>
       </div>
@@ -377,6 +384,15 @@ function price(inp, snap, ferSet){
   const honModo = inp.honorarioModo || "adicionado";
   const honFator = (honModo === "embutido" && honPct > 0) ? (1 - honPct) : 1;
 
+  // DESCONTOS / CONTRIBUIÇÕES (2026-07-22): retenções do Ofício Requisitório (previdenciária, IR/RRA)
+  // deduzidas NO PAGAMENTO -> o comprador realiza o LÍQUIDO = face − Σdescontos. Modelado como FATOR
+  // proporcional (líquido/face) sobre o realizado, em paralelo ao honFator: escala com a correção
+  // (a retenção incide sobre o valor pago) e compõe limpo com correção/acordo/honorário. Default
+  // (sem descontos) => liquidoFator=1 => cálculo idêntico (paridade dos golden preservada).
+  const descontos = Array.isArray(inp.descontos) ? inp.descontos : [];
+  const totalDescontos = descontos.reduce((s, d) => s + (d && d.valor > 0 ? d.valor : 0), 0);
+  const liquidoFator = (face > 0) ? Math.max(0, (face - totalDescontos) / face) : 1;
+
   // timeline meses 1..NMONTHS
   const date = [], dc = [], du = [], Pre = [], JR = [], IPCA = [], FRA = [], ten = [];
   let cumDu = [0];
@@ -493,7 +509,7 @@ function price(inp, snap, ferSet){
     earnoutPago += r63 + r64;
     if (isBullet) { recebidoBrutoBullet = recebido; earnoutPctBase = pctJanela(m); bulletIdx = m; }
     const des = desemb(m) * pricef;
-    r42[m] = recebido * honFator - r63 - r64 - des;   // honFator<1 só quando honorário embutido
+    r42[m] = recebido * honFator * liquidoFator - r63 - r64 - des;   // honFator/liquidoFator<1 quando há honorário embutido / descontos
     dates42[m] = date[m];
 
     // linha de detalhamento (read-only; não afeta a matemática)
@@ -536,7 +552,7 @@ function price(inp, snap, ferSet){
   const desembDate = (firstOut >= 0) ? dts[firstOut] : base;
   const Teff = (serial(bullet) - serial(desembDate)) / 365;            // prazo desembolso -> pagamento (clock da TIR)
   const fatorAc = inp.temAcordo ? inp.acordoFator : 1;
-  const faceRealizavel = face * fatorAc;                               // o que de fato se recebe de "face" (pós-acordo)
+  const faceRealizavel = face * fatorAc * liquidoFator;                // o que de fato se recebe de "face" (pós-acordo, líquido de descontos)
   const preComposto = (Teff > 0 && precoPago > 0) ? Math.pow(faceRealizavel / precoPago, 1 / Teff) - 1 : 0;
 
   return { tir, preco: precoPago, desagio, moic, prazoMedio,
@@ -547,6 +563,9 @@ function price(inp, snap, ferSet){
            // HONORÁRIO: valor = pct × recebido bruto do bullet; fator aplicado ao fluxo (só embutido).
            // tir/moic acima já são LÍQUIDOS de honorário quando modo="embutido".
            honorario: { pct: honPct, modo: honModo, fator: honFator, valor: honPct * recebidoBrutoBullet },
+           // DESCONTOS: fator líquido (fração fixa do precatório) aplicado ao realizado -> tir/moic já
+           // saem líquidos de descontos. valorLiquido/total em R$ de hoje (na face); itens = as rubricas.
+           descontos: { total: totalDescontos, fator: liquidoFator, valorLiquido: face - totalDescontos, itens: descontos.slice() },
            ipcaImplicito: ipcaSimples,   // a IPCA média aplicada = a linha IPCA da decomposição (mesmo número)
            ipcaSimples, spreadSimples, correcaoSimples, preComposto,
            earnoutZeragem: eoZera,   // { estado: "ZERA"|"NASCE_ZERADO"|"NAO_ZERA", data, valor }
@@ -655,22 +674,22 @@ if(typeof window!=="undefined") window.XlsxExport=_XAPI;
 </script>
 <script>
 const SNAP = {
-  "data_base": "2026-07-21",
+  "data_base": "2026-07-17",
   "pre": {
-    "b1": 0.147413690107577,
-    "b2": -0.00878392745057258,
-    "b3": -0.0252323146522168,
-    "b4": 0.0201329916326547,
-    "l1": 1.36154559282287,
-    "l2": 0.559317978727076
+    "b1": 0.145829072915462,
+    "b2": -0.00728447805013511,
+    "b3": -0.025115803484212,
+    "b4": 0.0255193037712764,
+    "l1": 1.10209393588501,
+    "l2": 0.506236346343821
   },
   "ipca": {
-    "b1": 0.0687062346276735,
-    "b2": 0.0642768505084365,
-    "b3": -0.032446185533087,
-    "b4": 0.0480684294705315,
-    "l1": 5.84674766208543,
-    "l2": 0.445656160866843
+    "b1": 0.0678038997924837,
+    "b2": 0.0649538646112728,
+    "b3": -0.0283310449504636,
+    "b4": 0.0475712772233875,
+    "l1": 5.62348249186108,
+    "l2": 0.431368461561965
   }
 };
 const FER = new Set(window.FERIADOS);
@@ -720,6 +739,18 @@ function renderParcelas(){
   const soma=PARCELAS.reduce((s,p)=>s+(p.valor||0),0);
   if($('parcSoma')) $('parcSoma').textContent=fmtBRL(soma);
 }
+// descontos / contribuições (rótulo + valor); reduzem o realizado (líquido) na precificação
+let DESCONTOS = [];
+function renderDescontos(){
+  const tb=$('tblDesc').querySelector('tbody'); if(!tb) return; tb.innerHTML='';
+  DESCONTOS.forEach((d,i)=>{ const tr=document.createElement('tr');
+    tr.innerHTML=`<td><input type="text" placeholder="INST.PREV. - SPPREV" value="${(d.rotulo||'').replace(/"/g,'&quot;')}" oninput="DESCONTOS[${i}].rotulo=this.value;recalc()"></td>
+      <td><input type="text" inputmode="decimal" value="${fmtBRL(d.valor||0)}" oninput="DESCONTOS[${i}].valor=parseMoney(this.value);recalc()" onblur="maskMoney(this)"><span class=suffix>R$</span></td>
+      <td><button type="button" class="btn" onclick="DESCONTOS.splice(${i},1);renderDescontos();recalc()">×</button></td>`;
+    tb.appendChild(tr); });
+}
+function addDesconto(){ DESCONTOS.push({rotulo:'', valor:0}); renderDescontos(); recalc(); }
+function lerDescontos(){ return DESCONTOS.filter(d=>d.valor>0).map(d=>({rotulo:(d.rotulo||'').trim()||'Desconto', valor:d.valor})); }
 const JAN_DEF = [[0,12,0],[13,24,0],[25,31,0],[32,10000,0]];
 function renderJanelas(){
   const tb=$('tblJan').querySelector('tbody'); tb.innerHTML='';
@@ -775,6 +806,7 @@ function readInputs(){
     eo2Valor:0, eo2Mes:18, sensPricef:1, sensPrazoDelta:0, dataInicio:di,
     honorarioPct: (($('inHonorarioPct').value||'').trim()==='' ? 0 : num('inHonorarioPct')/100),
     honorarioModo: $('inHonorarioModo').value,
+    descontos: lerDescontos(),
     ipcaOverride: (IPCAMODE==='manual') ? num('ipcaVal')/100 : null };
 }
 // IPCA implícito da ETTJ depende SÓ da curva + horizonte (vira/bullet), não de preço/face.
@@ -807,6 +839,7 @@ function recalc(){
     if(!EHPREC) $('reqOut').value='—';   // Valor requisitado (auto) só existe no modo DC
     $('rowEoZera').classList.add('hide');
     $('rowHon').classList.add('hide'); $('rowTirBruta').classList.add('hide'); $('tirHonTag').classList.add('hide');
+    $('rowDesc').classList.add('hide'); $('tirDescTag').classList.add('hide');
     updateIpcaImpl(inp);   // IPCA implícito ainda aparece (depende só da curva+prazo), não força 0
     $('tblSensX').querySelector('thead').innerHTML=''; ['tblSensX','tblSensEo'].forEach(id=>$(id).querySelector('tbody').innerHTML='');
     return;
@@ -830,6 +863,12 @@ function recalc(){
   if(IPCAMODE==='curva') $('ipcaVal').value=(o.ipcaImplicito*100).toFixed(2);
   // composição do recebimento
   $('cFace').textContent=fmtBRL(inp.face);
+  // descontos / contribuições: linha no painel Resultado (como o honorário) — total + líquido na face.
+  // TIR/MOIC já saem reduzidas pelo fator; a cascata "Composição" fica em valores brutos (igual honorário).
+  const desc=o.descontos, temDesc=desc.total>0;
+  $('rowDesc').classList.toggle('hide', !temDesc);
+  $('tirDescTag').classList.toggle('hide', !temDesc);
+  if(temDesc) $('rDesc').textContent='− '+fmtBRL(desc.total)+' · líquido '+fmtBRL(desc.valorLiquido);
   $('cJuros').textContent=fmtBRL(o.jurosPagos);
   $('cFaceC').textContent=fmtBRL(o.faceCorrigido);
   $('cRowAcordo').classList.toggle('hide', !inp.temAcordo);
@@ -935,6 +974,7 @@ function buildState(){
     dn:$('docNome').value, dd:$('docData').value, parc:PARCELAS,
     af:num('acFator'), ap:num('acPrazo'), ei:$('eoIdx').value, es:num('eoSpread'),
     hon:$('inHonorarioPct').value, hm:$('inHonorarioModo').value,
+    desc:DESCONTOS.map(d=>({rotulo:d.rotulo, valor:d.valor})),
     jan:JAN_DEF };
 }
 function applyState(s){ try{
@@ -944,6 +984,7 @@ function applyState(s){ try{
   $('ipcaVal').value=s.iv; $('valorPagar').value=s.vp||s.preco||'0,00'; if(s.di)$('dataInicio').value=s.di; if(s.np)$('nParcelas').value=s.np; $('tirAlvo').value=s.ta;
   $('acFator').value=s.af; $('acPrazo').value=s.ap; $('eoIdx').value=s.ei; $('eoSpread').value=s.es;
   if(s.hon!=null)$('inHonorarioPct').value=s.hon; if(s.hm)$('inHonorarioModo').value=s.hm;  // ausente => default (vazio/adicionado)
+  if(Array.isArray(s.desc)) DESCONTOS=s.desc.map(d=>({rotulo:d.rotulo, valor:d.valor}));   // renderizado no boot
   if(Array.isArray(s.jan)) JAN_DEF.splice(0,JAN_DEF.length,...s.jan);
   MODO=s.modo||'avista'; IPCAMODE=s.im||'curva';
   if(Array.isArray(s.parc)) PARCELAS=s.parc.map(p=>({date:p.date, valor:p.valor}));
@@ -1073,7 +1114,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(!$('docData').value){ const t=new Date(); $('docData').value=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
   updateDocTitle();
   if(MODO==='parcelado'){ if(PARCELAS.length) renderParcelas(); else regenParcelas(); }
-  renderJanelas(); sync();
+  renderDescontos(); renderJanelas(); sync();
 });
 </script>
 </body>
