@@ -656,12 +656,14 @@ function fillTemplate(templateU8, sc, snap, fflate){
   T("C22", sc.corrPreIdx||"Pré");
   T("C38", sc.eoIdx||"CDI");
   T("C55", sc.ipcaModo||"ETTJ");
+  T("C60", sc.honorarioModo||"adicionado");   // D-088 C: honorário/descontos (fila C59-61 do Painel)
   // números (percentuais em decimal; o estilo da célula formata como %)
   N("C10", sc.face); N("C11", sc.valorCausa); N("C12", sc.prazo);
   N("C14", sc.corrSpread); N("C21", sc.viraMeses); N("C23", sc.corrPre);
   N("C25", sc.valorPagar); N("C26", sc.nParcelas||1);
   N("C39", sc.eoSpread); N("C40", sc.eo2Valor); N("C41", sc.eo2Mes);
   N("C51", sc.acFator); N("C52", sc.acPrazo); N("C56", sc.ipcaManual); N("C57", sc.tirAlvo);
+  N("C59", sc.honorarioPct); N("C61", sc.descTotal);   // D-088 C: honorário % + descontos total
   // datas (serial Excel). G2 = data do cálculo. C15 = data de início (só se != data-base; senão mantém =Aux!G11).
   N("G2", _serial(sc.dataCalculo||snap.data_base));
   if(sc.dataInicio && sc.dataInicio!==snap.data_base) N("C15", _serial(sc.dataInicio));
@@ -1093,6 +1095,8 @@ function exportarXlsx(){
     valorPagar:money('valorPagar'), nParcelas:num('nParcelas')||1, dataInicio:$('dataInicio').value||null,
     eoIdx:inp.eoIdx, eoSpread:inp.eoSpread, eo2Valor:0, eo2Mes:18,
     acFator:inp.acordoFator, acPrazo:inp.acordoPrazo,
+    honorarioPct:inp.honorarioPct||0, honorarioModo:inp.honorarioModo||'adicionado',
+    descTotal:(inp.descontos||[]).reduce((s,d)=>s+(d.valor||0),0),
     ipcaModo:(inp.ipcaOverride!=null)?'Manual':'ETTJ', ipcaManual:inp.ipcaOverride||0, tirAlvo:num('tirAlvo')/100,
     janelas:(inp.eoJanelas||[]).map(w=>[w.de,w.ate,w.pct]),
     parcelas:(MODO==='parcelado')?inp.levas.map(l=>({date:l.date,valor:l.valor})):null,
