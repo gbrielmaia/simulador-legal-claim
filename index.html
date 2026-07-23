@@ -87,6 +87,15 @@
   table.xtab td.basecol{background:rgba(31,78,121,.04);}
   table.xtab tr.baserow td{background:rgba(31,78,121,.04);}
   table.xtab td.basecase{background:#EAF1F8;color:var(--ink);font-weight:700;}
+  /* cabeçalhos editáveis da sensibilidade (preço nas colunas, prazo nas linhas) */
+  table.xtab input.sxin{font-family:'IBM Plex Mono',monospace;border:none;background:transparent;color:inherit;padding:1px 2px;margin:0;font-weight:inherit;-moz-appearance:textfield;}
+  table.xtab input.sxin::-webkit-outer-spin-button,table.xtab input.sxin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  table.xtab thead th input.sxin{font-size:9.5px;color:var(--ink-mute);font-weight:600;text-align:right;width:52px;}
+  table.xtab thead th.basecol input.sxin{color:var(--gold-deep);font-weight:700;}
+  table.xtab tbody th input.sxin.sxprazo{font-size:11px;color:var(--ink-soft);font-weight:500;text-align:left;width:32px;}
+  table.xtab tbody th.baserow input.sxin{color:var(--gold-deep);font-weight:700;}
+  table.xtab input.sxin:focus{outline:1px solid var(--gold);background:#fff;border-radius:2px;}
+  table.xtab .sxsfx{color:var(--ink-mute);font-size:9px;margin-left:1px;}
   .adv-h{cursor:pointer;user-select:none;} .adv-h::before{content:"▸ ";color:var(--gold);}
   .adv-h.open::before{content:"▾ ";}
   .hide{display:none!important;}
@@ -925,42 +934,103 @@ function recalc(){
     $('rowTirBruta').classList.add('hide');
   }
   // ---- sensibilidades ----
-  const f2=(x)=>(x*100).toFixed(2)+'%';
-  const fmtM=(v)=> (v/1e6).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'M';
-  let tb;
-  // matriz cruzada TIR — linhas = prazo, colunas = preço pago
+  renderSensX(o, inp);
+}
+
+// ================= Sensibilidade — TIR (prazo × preço) editável =================
+// Estado de módulo: preserva os preços/prazos digitados entre recomputes locais.
+// recalc() -> renderSensX() reconstrói os cabeçalhos com os defaults (= reset).
+// Editar um input -> redrawSensBody() recomputa só a matriz (não dispara recalc()).
+let SENS = null;
+
+function fmtUnit(v, u){
+  return (v/u.div).toLocaleString('pt-BR',{minimumFractionDigits:u.minDec,maximumFractionDigits:u.maxDec});
+}
+function parseUnitInput(str, u){
+  const n = parseFloat(String(str).replace(/\./g,'').replace(',','.')) || 0;   // pt-BR: tira milhar, vírgula->ponto
+  return n * u.div;
+}
+
+function renderSensX(o, inp){
+  // unidade fixa pela base: < R$1mm -> "mil"; caso contrário -> "M"
+  const unit = o.preco < 1e6
+    ? {div:1e3, sfx:'R$ mil', minDec:0, maxDec:2}
+    : {div:1e6, sfx:'R$ M',   minDec:2, maxDec:2};
   const priceFactors=[0.8,0.9,1.0,1.1,1.2];
   const basePrazo = inp.temAcordo ? inp.acordoPrazo : inp.prazoMeses;
   const stepP = Math.max(1, Math.floor(basePrazo/4));   // passo adaptativo: prazo sempre centrado e positivo
-  let hrow='<tr><th class="corner">prazo \\ preço</th>';
-  priceFactors.forEach(f=>{ hrow+=`<th${Math.abs(f-1)<1e-9?' class="basecol"':''}>${fmtM(o.preco*f)}</th>`; });
+  SENS = {
+    o, inp, unit,
+    basePreco: o.preco, basePrazo, temAcordo: inp.temAcordo,
+    prices: priceFactors.map(f=>o.preco*f),
+    prazos: [-2,-1,0,1,2].map(k=>basePrazo + k*stepP),
+  };
+  // cabeçalho: canto (com rótulo da unidade) + inputs editáveis de preço
+  let hrow=`<tr><th class="corner">prazo \\ preço (${unit.sfx})</th>`;
+  SENS.prices.forEach((p,j)=>{
+    const base = Math.abs(p - o.preco) < 1;
+    hrow+=`<th${base?' class="basecol"':''}><input class="sxin sxprice" inputmode="decimal" data-j="${j}" value="${fmtUnit(p,unit)}" onchange="sensEditPrice(this)"></th>`;
+  });
   $('tblSensX').querySelector('thead').innerHTML=hrow+'</tr>';
+  redrawSensBody();
+  renderSensEo(o, inp);
+}
+
+function redrawSensBody(){
+  if(!SENS) return;
+  const {o, inp, unit, prices, prazos, basePreco, basePrazo, temAcordo} = SENS;
   const xb=$('tblSensX').querySelector('tbody'); xb.innerHTML='';
-  [-2,-1,0,1,2].forEach(k=>{
-    const d=k*stepP, p=basePrazo+d;
-    let row=`<tr${k===0?' class="baserow"':''}><th${k===0?' class="baserow"':''}>${p}m</th>`;
-    priceFactors.forEach(f=>{
+  let html='';
+  prazos.forEach((p, ki)=>{
+    const isBaseRow = (p === basePrazo);
+    const d = temAcordo ? null : (p - basePrazo);
+    let row=`<tr${isBaseRow?' class="baserow"':''}><th${isBaseRow?' class="baserow"':''}>`
+          +`<input class="sxin sxprazo" inputmode="numeric" data-k="${ki}" value="${p}" onchange="sensEditPrazo(this)"><span class="sxsfx">m</span></th>`;
+    prices.forEach((preco)=>{
+      const f = basePreco>0 ? preco/basePreco : 1;
       const inp2=Object.assign({},inp,{sensPricef:f});
-      if(inp.temAcordo) inp2.acordoPrazo=p; else inp2.sensPrazoDelta=d;
+      if(temAcordo) inp2.acordoPrazo=p; else inp2.sensPrazoDelta=d;
       const o2=PrecatEngine.price(inp2,SNAP,FER);
-      const cls = (k===0 && Math.abs(f-1)<1e-9) ? 'basecase' : (Math.abs(f-1)<1e-9 ? 'basecol' : '');
+      const isBaseCol = Math.abs(preco - basePreco) < 1;
+      const cls = (isBaseRow && isBaseCol) ? 'basecase' : (isBaseCol ? 'basecol' : '');
       row+=`<td${cls?` class="${cls}"`:''}>${(o2.tir*100).toFixed(1)}%</td>`;
     });
-    xb.innerHTML+=row+'</tr>';
+    html+=row+'</tr>';
   });
+  xb.innerHTML=html;
+}
+
+function sensEditPrice(el){
+  if(!SENS) return;
+  const j=+el.dataset.j;
+  const v=parseUnitInput(el.value, SENS.unit);
+  if(v>0) SENS.prices[j]=v;
+  el.value=fmtUnit(SENS.prices[j], SENS.unit);                                  // reformata na unidade
+  el.parentElement.classList.toggle('basecol', Math.abs(SENS.prices[j]-SENS.basePreco)<1);
+  redrawSensBody();
+}
+function sensEditPrazo(el){
+  if(!SENS) return;
+  const k=+el.dataset.k;
+  const v=Math.round(parseFloat(String(el.value).replace(',','.'))||0);
+  if(v>0) SENS.prazos[k]=v;
+  redrawSensBody();                                                            // reconstrói tbody (reformata o input)
+}
+
+function renderSensEo(o, inp){
   // TIR × earn-out (% do earn-out ±10/±20pp em torno do base) — só quando há earn-out
-  if(inp.temEarnout){
-    const basePct=o.earnoutPctBase;                       // % ativo no pagamento (base)
-    tb=$('tblSensEo').querySelector('tbody'); tb.innerHTML='';
-    [-0.20,-0.10,0,0.10,0.20].forEach(d=>{
-      const pct=Math.max(0,Math.min(1,basePct+d));
-      const jan=(inp.eoJanelas||[]).map(w=>({de:w.de,ate:w.ate,pct:Math.max(0,Math.min(1,w.pct+d))}));
-      const o2=PrecatEngine.price(Object.assign({},inp,{eoJanelas:jan}),SNAP,FER);
-      const tr=document.createElement('tr'); if(Math.abs(d)<1e-9) tr.className='basecase';
-      tr.innerHTML=`<td>${(pct*100).toFixed(0)}%</td><td>${f2(o2.tir)}</td>`;
-      tb.appendChild(tr);
-    });
-  }
+  const f2=(x)=>(x*100).toFixed(2)+'%';
+  if(!inp.temEarnout) return;
+  const basePct=o.earnoutPctBase;                         // % ativo no pagamento (base)
+  const tb=$('tblSensEo').querySelector('tbody'); tb.innerHTML='';
+  [-0.20,-0.10,0,0.10,0.20].forEach(d=>{
+    const pct=Math.max(0,Math.min(1,basePct+d));
+    const jan=(inp.eoJanelas||[]).map(w=>({de:w.de,ate:w.ate,pct:Math.max(0,Math.min(1,w.pct+d))}));
+    const o2=PrecatEngine.price(Object.assign({},inp,{eoJanelas:jan}),SNAP,FER);
+    const tr=document.createElement('tr'); if(Math.abs(d)<1e-9) tr.className='basecase';
+    tr.innerHTML=`<td>${(pct*100).toFixed(0)}%</td><td>${f2(o2.tir)}</td>`;
+    tb.appendChild(tr);
+  });
 }
 // ---- goal seek: preço para TIR-alvo ----
 function solvePricef(inp, target){
